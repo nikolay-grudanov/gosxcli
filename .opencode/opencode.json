@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".opencode/rules/*.md"],
+  "small_model": "lmstudio/gemma-4-e4b-it",
+  "agent": {
+    "general": {
+      "model": "minimax/MiniMax-M2.5"
+    },
+    "explore": {
+      "model": "minimax/MiniMax-M2.5"
+    }
+  }
+}
