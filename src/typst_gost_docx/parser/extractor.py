@@ -16,15 +16,14 @@ from ..ir.model import (
     TableRow,
     TableCell,
     Equation,
-    Emphasis,
-    Strong,
     CrossReference,
+    BaseNode,
     SourceLocation,
     NumberingKind,
     ListKind,
     NodeType,
 )
-from .scanner import TypstScanner, Token
+from .scanner import TypstScanner
 
 
 class TypstExtractor:
@@ -100,9 +99,44 @@ class TypstExtractor:
             id=str(uuid.uuid4()),
             source_location=SourceLocation(self.file_path, token.line, token.column),
         )
-        paragraph.content = [TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=text)]
+        paragraph.content = self._parse_inline_content(text)
 
         return paragraph
+
+    def _parse_inline_content(self, text: str) -> list[BaseNode]:
+        nodes: list[BaseNode] = []
+        pattern = r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"
+
+        last_end = 0
+        for match in re.finditer(pattern, text):
+            if match.start() > last_end:
+                plain_text = text[last_end : match.start()]
+                nodes.append(
+                    TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=plain_text)
+                )
+
+            label = match.group(0)
+            target_label = match.group(0)
+            nodes.append(
+                CrossReference(
+                    node_type=NodeType.CROSS_REFERENCE,
+                    id=str(uuid.uuid4()),
+                    target_label=target_label,
+                )
+            )
+
+            last_end = match.end()
+
+        if last_end < len(text):
+            plain_text = text[last_end:]
+            nodes.append(
+                TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=plain_text)
+            )
+
+        if not nodes:
+            nodes = [TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=text)]
+
+        return nodes
 
     def _extract_list(self) -> Optional[ListBlock]:
         token = self.tokens[self.pos]
@@ -119,11 +153,16 @@ class TypstExtractor:
             if current_token.type == "BULLET" or current_token.type == "NUMBERED":
                 self.pos += 1
                 text = self._get_text_until_newline()
+                content: list[BaseNode] = [
+                    TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=text)
+                ]
                 item = ListItem(
                     id=str(uuid.uuid4()),
-                    content=[TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=text)],
+                    content=content,
                 )
                 list_block.items.append(item)
+            elif current_token.type == "TEXT" or current_token.type == "NEWLINE":
+                self.pos += 1
             else:
                 break
 
@@ -163,15 +202,75 @@ class TypstExtractor:
             source_location=SourceLocation(self.file_path, token.line, token.column),
         )
 
-        row = TableRow(id=str(uuid.uuid4()))
-        cell = TableCell(
-            id=str(uuid.uuid4()),
-            content=[TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=content[:50])],
-        )
-        row.cells.append(cell)
-        table.rows.append(row)
+        lines = content.split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            if "table.header(" in line:
+                cells = self._extract_header_cells(line)
+                if cells:
+                    row = TableRow(id=str(uuid.uuid4()))
+                    row.cells.extend(cells)
+                    table.rows.append(row)
+                    table.has_header = True
+            elif line.startswith("["):
+                cells = self._extract_row_cells(line)
+                if cells:
+                    row = TableRow(id=str(uuid.uuid4()))
+                    row.cells.extend(cells)
+                    table.rows.append(row)
 
         return table
+
+    def _extract_header_cells(self, line: str) -> list[TableCell]:
+        cells: list[TableCell] = []
+        content = line[line.find("table.header(") + len("table.header(") :]
+        content = content.rstrip(")").strip()
+
+        while content.startswith("["):
+            end_bracket = content.find("]")
+            if end_bracket == -1:
+                break
+
+            cell_text = content[1:end_bracket].strip()
+            cell_content: list[BaseNode] = [
+                TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
+            ]
+            cell = TableCell(
+                id=str(uuid.uuid4()),
+                content=cell_content,
+            )
+            cells.append(cell)
+
+            content = content[end_bracket + 1 :].strip()
+
+        return cells
+
+    def _extract_row_cells(self, line: str) -> list[TableCell]:
+        cells: list[TableCell] = []
+        content = line.strip()
+
+        while content.startswith("["):
+            end_bracket = content.find("]")
+            if end_bracket == -1:
+                break
+
+            cell_text = content[1:end_bracket].strip()
+            cell_content: list[BaseNode] = [
+                TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
+            ]
+            cell = TableCell(
+                id=str(uuid.uuid4()),
+                content=cell_content,
+            )
+            cells.append(cell)
+
+            content = content[end_bracket + 1 :].strip()
+
+        return cells
 
     def _extract_equation(self) -> Optional[Equation]:
         token = self.tokens[self.pos]

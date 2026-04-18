@@ -3,21 +3,21 @@
 from pathlib import Path
 from typing import Optional
 from docx import Document
-from docx.shared import Inches, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches
 from ..ir.model import (
     Document as IRDocument,
     BaseNode,
     Section,
     Paragraph,
     ListBlock,
-    ListItem,
     Table,
     Figure,
     Caption,
+    Equation,
+    CrossReference,
+    TextRun,
     NumberingKind,
     ListKind,
-    NodeType,
 )
 from .bookmarks import BookmarksManager
 from .styles import StylesManager
@@ -61,6 +61,8 @@ class DocxWriter:
             self._write_block(block)
 
     def _write_block(self, block: BaseNode) -> None:
+        from ..ir.model import Equation, CrossReference
+
         if isinstance(block, Section):
             self._write_section(block)
         elif isinstance(block, Paragraph):
@@ -71,6 +73,10 @@ class DocxWriter:
             self._write_figure(block)
         elif isinstance(block, Table):
             self._write_table(block)
+        elif isinstance(block, Equation):
+            self._write_equation(block)
+        elif isinstance(block, CrossReference):
+            pass
 
     def _write_section(self, section: Section) -> None:
         self.stats["headings"] += 1
@@ -85,9 +91,18 @@ class DocxWriter:
     def _write_paragraph(self, paragraph: Paragraph) -> None:
         self.stats["paragraphs"] += 1
 
-        text = self._nodes_to_text(paragraph.content)
-        para = self.doc.add_paragraph(text, style="Normal")
+        para = self.doc.add_paragraph(style="Normal")
+        self._write_inline_nodes(para, paragraph.content)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
+
+    def _write_inline_nodes(self, para, nodes: list[BaseNode]) -> None:
+        for node in nodes:
+            if isinstance(node, TextRun):
+                para.add_run(node.text)
+            elif isinstance(node, CrossReference):
+                self._write_cross_reference(node, para)
+            elif hasattr(node, "content"):
+                self._write_inline_nodes(para, node.content)
 
     def _write_list(self, list_block: ListBlock) -> None:
         style = "List Bullet" if list_block.kind == ListKind.BULLET else "List Number"
@@ -111,6 +126,63 @@ class DocxWriter:
     def _write_table(self, table: Table) -> None:
         self.stats["tables"] += 1
         self.tables_manager.add_table(self.doc, table)
+
+    def _write_equation(self, equation: Equation) -> None:
+        self.stats["equations"] += 1
+
+        try:
+            from latex2mathml import converter
+
+            omml = converter.convert(equation.latex)
+
+            para = self.doc.add_paragraph(style="Normal")
+            run = para.add_run()
+
+            run._element.append(omml)
+
+            self.stats["warnings"] += 1
+        except Exception:
+            para = self.doc.add_paragraph(style="Normal")
+            run = para.add_run(f"[FORMULA: {equation.latex}]")
+            self.stats["warnings"] += 1
+
+        if equation.caption:
+            self._write_caption(equation.caption)
+
+    def _write_cross_reference(self, ref: CrossReference, para) -> None:
+        target = self.bookmarks_manager.get_bookmark(ref.target_label)
+
+        if target:
+            from docx.oxml.shared import OxmlElement, qn
+
+            hyperlink = OxmlElement("w:hyperlink")
+            hyperlink.set(qn("w:anchor"), ref.target_label)
+
+            run = OxmlElement("w:r")
+            rPr = OxmlElement("w:rPr")
+
+            wcolor = OxmlElement("w:color")
+            wcolor.set(qn("w:val"), "0000FF")
+            rPr.append(wcolor)
+
+            wu = OxmlElement("w:u")
+            wu.set(qn("w:val"), "single")
+            rPr.append(wu)
+
+            run.append(rPr)
+
+            wt = OxmlElement("w:t")
+            wt.text = ref.ref_text if ref.ref_text else ref.target_label
+            run.append(wt)
+
+            hyperlink.append(run)
+            para._element.append(hyperlink)
+
+            self.stats["refs_resolved"] += 1
+        else:
+            run = para.add_run(ref.ref_text if ref.ref_text else ref.target_label)
+            self.stats["refs_unresolved"] += 1
+            self.stats["warnings"] += 1
 
     def _write_caption(self, caption: Caption) -> None:
         prefix = ""

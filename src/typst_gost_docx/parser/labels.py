@@ -2,7 +2,6 @@
 
 import re
 import uuid
-from typing import Optional
 from ..ir.model import (
     BaseNode,
     CrossRefMap,

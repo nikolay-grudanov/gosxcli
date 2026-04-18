@@ -1,7 +1,6 @@
 """Tables manager for handling table creation."""
 
 from docx import Document
-from docx.shared import Inches
 from ..ir.model import Table as IRTable
 
 

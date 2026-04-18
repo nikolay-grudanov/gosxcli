@@ -5,6 +5,7 @@ import tempfile
 from typst_gost_docx.ingest.project_loader import TypstProjectLoader
 from typst_gost_docx.parser.scanner import TypstScanner
 from typst_gost_docx.parser.extractor import TypstExtractor
+from typst_gost_docx.writers.docx_writer import DocxWriter
 
 
 def test_minimal_document_load():
@@ -101,3 +102,33 @@ $$block math$$
     assert "NUMBERED" in token_types
     assert "INLINE_MATH_DELIM" in token_types
     assert "BLOCK_MATH_DELIM" in token_types
+
+
+def test_e2e_conversion():
+    """End-to-end test of minimal document conversion."""
+    text = """= Заголовок
+
+Это параграф со ссылкой @fig-test.
+
+#figure(
+  image("test.png"),
+  caption: [Тестовый рисунок],
+) <fig-test>
+"""
+    scanner = TypstScanner(text)
+    extractor = TypstExtractor(scanner, "test.typ")
+    doc = extractor.extract()
+
+    assert doc.node_type == "document"
+    assert len(doc.blocks) >= 1
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "output.docx"
+        writer = DocxWriter()
+        stats = writer.write(doc, output_path)
+
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+        assert stats["headings"] > 0
+        assert stats["paragraphs"] > 0
+        assert stats["figures"] > 0

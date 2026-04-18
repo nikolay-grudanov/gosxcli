@@ -12,6 +12,8 @@ class NodeType(str, Enum):
     LIST_BLOCK = "list_block"
     LIST_ITEM = "list_item"
     TABLE = "table"
+    TABLE_ROW = "table_row"
+    TABLE_CELL = "table_cell"
     FIGURE = "figure"
     EQUATION = "equation"
     TEXT_RUN = "text_run"
@@ -45,8 +47,8 @@ class SourceLocation:
 
 @dataclass
 class BaseNode:
-    node_type: NodeType
-    id: str
+    id: str = ""
+    node_type: NodeType = NodeType.DOCUMENT
     label: Optional[str] = None
     source_location: Optional[SourceLocation] = None
     style_hints: dict[str, Any] = field(default_factory=dict)
@@ -98,13 +100,13 @@ class Table(BaseNode):
 
 @dataclass
 class TableRow(BaseNode):
-    node_type: NodeType = NodeType.TABLE
+    node_type: NodeType = NodeType.TABLE_ROW
     cells: list["TableCell"] = field(default_factory=list)
 
 
 @dataclass
 class TableCell(BaseNode):
-    node_type: NodeType = NodeType.TABLE
+    node_type: NodeType = NodeType.TABLE_CELL
     content: list[BaseNode] = field(default_factory=list)
     colspan: int = 1
     rowspan: int = 1

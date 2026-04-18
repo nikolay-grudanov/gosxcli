@@ -1,6 +1,5 @@
 """Resolve references."""
 
-from typing import Optional
 from ..ir.model import (
     BaseNode,
     CrossReference,

@@ -12,8 +12,6 @@ from .logging import setup_logging
 from .ingest.project_loader import TypstProjectLoader
 from .parser.scanner import TypstScanner
 from .parser.extractor import TypstExtractor
-from .parser.labels import LabelExtractor
-from .parser.refs import RefResolver
 from .writers.docx_writer import DocxWriter
 
 app = typer.Typer(help="Typst to DOCX converter for academic documents")
