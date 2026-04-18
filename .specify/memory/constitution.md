@@ -1,50 +1,194 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Gosxcli Constitution
 
-## Core Principles
+<!--
+Sync Impact Report:
+- Version change: initial → 1.0.0
+- Added principles:
+  1. Единственная ответственность пайплайна
+  2. IR как священный контракт
+  3. ГОСТ-первичность
+  4. Фикстурное тестирование как документация
+  5. Явный контракт поддерживаемых возможностей
+  6. Строгий и мягкий режимы
+  7. AI-агент-совместимость
+  8. Версионирование через возможности
+- Added sections:
+  - Vision
+  - Invariants
+  - IR Contract
+  - Scope Boundary
+  - Testing Mandate
+  - GOST Compliance Matrix
+  - Agent Collaboration Rules
+- Templates to update: none
+- TODO: none (all placeholders resolved)
+-->
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+## Vision
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+CLI-инструмент для конвертации Typst-документов в DOCX с полной поддержкой ГОСТ 7.32-2017 для академических работ, диссертаций и научных публикаций.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+## Invariants
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+При нарушении любого из следующих принципов Pull Request не принимается:
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+1. **Единственная ответственность пайплайна** — каждый слой (Ingest, Parser, IR, Writer) выполняет строго одну задачу. Запрещено смешивание логики слоёв.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+2. **IR как священный контракт** — IRDocument является единственным интерфейсом между Frontend (Ingest → Parser) и Backend (Writer). Никаких обходных путей.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+3. **Тихий пропуск запрещён** — если Typst-конструкция не поддерживается, выводится предупреждение в лог. Пропуск без уведомления — нарушение.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+4. **4-слойная архитектура ненарушаема** — модули не могут импортировать модули из несмежных слоёв.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+5. **Строгий режим не ломает мягкий** — добавление --strict не должно менять поведение в обычном режиме.
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+## IR Contract
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### Версионирование IR
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+- Формат: `IR_X_Y` где X — мажорная версия (breaking changes в структуре node), Y — минорная (новые поля без breaking changes)
+- Текущая версия: `IR_1_0`
+- При добавлении нового типа узла:
+  - Изменение мажорной версии если удалён существующий тип или изменена структура
+  - Изменение минорной версии если добавлен новый тип или новое поле
+
+### Правила добавления node-типов
+
+1. Новый тип добавляется в `ir/model.py` как Pydantic model
+2. Обязательны: тип, позиция в документе (chapter, section)
+3. Опциональные: атрибуты (caption, label, ref)
+4. Каждый новый тип требует документации в docstring
+5. Parser должен заполнять все обязательные поля
+
+### Запрещённые изменения IR
+
+- Удаление полей у существующих типов
+- Изменение типов полей (int → str)
+- Добавление required полей без мажорного версионирования
+
+## Scope Boundary
+
+Проект НЕ поддерживает и НЕ будет поддерживать:
+
+| Категория | Ограничение | Причина |
+|-----------|-------------|---------|
+| Форматы | PDF, HTML, LaTeX на выходе | Только DOCX по ТЗ |
+| Редактирование | Обратная конвертация DOCX → Typst | Не в scope |
+| Сложная вёрстка | Многоколоночный layout, floating elements | Ограничения python-docx |
+| Динамический контент | runtime-вычисления Typst | Парсинг статичен |
+| Шрифты | Синтез шрифтов, OTF features | python-docx ограничения |
+| Collaboration | Редактирование в реальном времени | CLI-only инструмент |
+
+## Testing Mandate
+
+### Правило фикстур как условие мержа
+
+Каждая Typst-конструкция, поддержка которой заявлена, должна иметь:
+
+1. **Входная фикстура** — `.typ` файл с примером конструкции в `tests/fixtures/typ/`
+2. **Выходная фикстура** — `.docx` файл с ожидаемым результатом в `tests/fixtures/docx/`
+3. **Тест-скрипт** — pytest-тест проверяющий соответствие
+
+### Структура фикстур
+
+```
+tests/fixtures/
+├── typ/
+│   ├── headings/
+│   │   ├── level_1.typ
+│   │   ├── level_2.typ
+│   │   └── level_3.typ
+│   ├── tables/
+│   │   ├── basic.typ
+│   │   └── colspan.typ
+│   └── ...
+└── docx/
+    ├── headings/
+    │   ├── level_1.docx
+    │   ├── level_2.docx
+    │   └── level_3.docx
+    └── ...
+```
+
+### Критерии принятия теста
+
+- Тест проходит для всех заявленных Typst-конструкций
+- Тест документирует ограничения для неподдерживаемых конструкций
+- Обновление ожидаемого DOCX требует review
+
+## GOST Compliance Matrix
+
+| ГОСТ 7.32-2017 требование | Статус | Описание |
+|---------------------------|--------|----------|
+| Титульный лист | Planned v0.2 | Генерация титульного листа |
+| Содержание (оглавление) | Planned v0.2 | Автоматическое оглавление |
+| Заголовки разделов 1-3 уровня | Supported | Встроенная поддержка |
+| Нумерация разделов | Supported | Автоматическая нумерация |
+| Абзацы | Supported | Базовое форматирование |
+| Списки (маркированные) | Supported | Поддержка bullet lists |
+| Списки (нумерованные) | Supported | Поддержка numbered lists |
+| Рисунки (figure) | Supported | С подписями и нумерацией |
+| Таблицы | Supported | Базовые таблицы |
+| Таблицы (colspan/rowspan) | Planned v0.2 | Объединение ячеек |
+| Математика (inline) | Supported | MVP, ограничения для сложных формул |
+| Математика (блок) | Supported | MVP, ограничения для сложных формул |
+| Ссылки на рисунки/таблицы | Supported | Разрешение @label |
+| Сноски | Planned v0.3 | Footnotes |
+| Библиография | Planned v0.3 | Bibliography support |
+| Приложения | Planned v0.3 | Appendix sections |
+
+## Agent Collaboration Rules
+
+### AI-агент совместимость
+
+Проект спроектирован для работы AI-агентов:
+
+1. **Machine-readable architecture** — все модули документированы с типами, docstrings в Google Style
+2. **4-layer boundary enforcement** — агенты не могут случайно нарушить архитектуру из-за чётких границ
+3. **IR Contract clarity** — агенты понимают контракт через типизированные модели
+4. **Test-driven development** — агенты добавляют тесты до реализации
+
+### Workflow для AI-агентов
+
+```
+1. Изучить конституцию (.specify/memory/constitution.md)
+2. Изучить архитектуру (README.md, AGENTS.md)
+3. Определить слой реализации
+4. Проверить IR Contract
+5. Добавить фикстуры в tests/fixtures/
+6. Реализовать в соответствующем слое
+7. Пройти quality gates: ruff, mypy, pytest
+8. Пройти review через @gosxcli-reviewer
+```
+
+### Quality Gates (обязательны для всех агентов)
+
+- `ruff check src/` — 0 ошибок
+- `ruff format src/` — форматирование
+- `mypy --strict src/` — 0 ошибок типизации
+- `pytest tests/` — все тесты проходят
+
+### Версионирование через возможности
+
+SemVer применяется к Typst-конструкциям:
+
+- **MAJOR** — удаление поддержки Typst-конструкции
+- **MINOR** — добавление новой Typst-конструкции
+- **PATCH** — исправления багов без изменения функциональности
+
+### GOST-первичность
+
+Любое форматирование в пользу ГОСТ. При конфликте:
+1. Предпочитать ГОСТ-стиль
+2. Документировать отклонения
+3. Предоставлять флаги для переключения стилей
+
+### Строгий и мягкий режимы
+
+- **Мягкий режим (по умолчанию)** — предупреждения для неподдерживаемых конструкций, прогрессивное ухудшение
+- **Строгий режим (`--strict`)** — ошибки вместо предупреждений, остановка при первой проблеме
+- Оба режима детерминированы — одинаковый вход = одинаковый выход
+
+---
+
+**Version**: 1.0.0 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
