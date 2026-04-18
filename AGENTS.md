@@ -10,6 +10,8 @@
 
 **Constitution:** [.specify/memory/constitution.md](.specify/memory/constitution.md) — принципы проекта, IR-контракт, правила работы агентов
 
+**Project State:** [state.md](state.md) — текущий статус, прогресс, известные проблемы (ОБЯЗАТЕЛЬНО читать перед работой и обновлять после)
+
 ---
 
 ## Architecture
@@ -243,6 +245,14 @@ typst-gost-docx convert thesis.typ -o thesis.docx --debug --dump-ir
 
 ## Agent Workflow
 
+**ВАЖНО:** Перед выполнением любой задачи ОБЯЗАТЕЛЬНО прочитайте [state.md](state.md) чтобы:
+- Понять текущий статус проекта
+- Проверить нет ли дубликатов работы
+- Избежать конфликтов с активными задачами
+- Понять приоритеты и контекст
+
+После завершения задачи ОБЯЗАТЕЛЬНО обновите [state.md](state.md).
+
 ### Orchestration Pattern
 
 1. **User** → `gosxcli-orchestrator` (анализ и планирование)
@@ -285,10 +295,30 @@ Subagents вызываются через @-упоминание или Task too
 
 ### Before Contributing
 
-1. Изучите архитектуру проекта (4-layer pipeline)
-2. Понимайте границы модулей
-3. Соблюдайте coding conventions
-4. Пройдите code review через `@gosxcli-reviewer`
+Перед началом работы:
+
+1. **Прочитайте конституцию:** [.specify/memory/constitution.md](.specify/memory/constitution.md)
+2. **Прочитайте состояние проекта:** [state.md](state.md) — ОБЯЗАТЕЛЬНО
+   - Изучите текущий статус и метрики
+   - Проверьте Known Issues (может быть уже решена?)
+   - Посмотрите Next Steps (может быть ваша задача?)
+   - Проверьте Current Work (что уже в процессе)
+3. Изучите архитектуру проекта (4-layer pipeline)
+4. Понимайте границы модулей
+5. Соблюдайте coding conventions
+6. Пройдите code review через `@gosxcli-reviewer`
+
+### After Contributing
+
+После завершения работы:
+
+1. **Обновите state.md:**
+   - Отметьте выполненные задачи в Current Work
+   - Обновите статус в Progress Tracker
+   - Закройте решённые проблемы в Known Issues
+   - Добавьте новые решения в Decisions Log
+   - Обновите Last Updated дату
+2. Создайте коммит с изменениями
 
 ### Pull Request Checklist
 
