@@ -59,7 +59,7 @@ $$ <eq-test>
     assert figures[0].caption.text == "Test caption"
 
     # Check equation
-    equations = [b for b in doc.blocks if b.node_type == "equation"]
+    _equations = [b for b in doc.blocks if b.node_type == "equation"]
     # Note: block math parsing needs $$ on same line as content
     # For now, just check that document is parsed correctly
     assert len(doc.blocks) >= 4  # heading, para, list (with 2 items), figure

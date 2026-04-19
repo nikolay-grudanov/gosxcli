@@ -36,6 +36,7 @@ class TypstScanner:
             ("FIGURE_START", r"#figure\("),
             ("TABLE_START", r"#table\("),  # standalone
             ("TABLE_START", r"(\n  table\()"),  # nested (normalize)
+            ("OUTLINE_START", r"#outline\("),
             ("HEADING", r"={1,6}\s+"),
             ("BULLET", r"-\s"),
             ("NUMBERED", r"\d+\.\s"),

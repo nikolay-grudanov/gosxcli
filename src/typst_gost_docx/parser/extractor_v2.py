@@ -19,8 +19,10 @@ from ..ir.model import (
     TableNode,
     TableHeaderNode,
     TableCellNode,
+    ColSpec,
     Equation,
     CrossReference,
+    TOCNode,
     NodeType,
     NumberingKind,
     ListKind,
@@ -63,8 +65,10 @@ class TypstExtractorV2:
         Returns:
             IR Document
         """
+        from ..ir.model import IRNode
+
         doc = Document(id=str(uuid.uuid4()))
-        blocks = []
+        blocks: list[IRNode] = []
 
         while self.pos < len(self.tokens):
             token = self.tokens[self.pos]
@@ -85,6 +89,10 @@ class TypstExtractorV2:
                 table = self._extract_table()
                 if table:
                     blocks.append(table)
+            elif token.type == "OUTLINE_START":
+                outline = self._extract_outline()
+                if outline:
+                    blocks.append(outline)
             elif token.type == "BLOCK_MATH_DELIM":
                 equation = self._extract_equation()
                 if equation:
@@ -120,7 +128,9 @@ class TypstExtractorV2:
         section = Section(
             id=str(uuid.uuid4()),
             level=level,
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
             numbering_kind=NumberingKind.SECTION,
         )
 
@@ -148,7 +158,9 @@ class TypstExtractorV2:
 
         paragraph = Paragraph(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
             runs=runs,
         )
 
@@ -204,7 +216,9 @@ class TypstExtractorV2:
         list_block = ListBlock(
             id=str(uuid.uuid4()),
             kind=kind,
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
         )
 
         while self.pos < len(self.tokens):
@@ -243,7 +257,9 @@ class TypstExtractorV2:
 
         figure = Figure(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
         )
 
         image_path = self._extract_image_path(content)
@@ -281,8 +297,16 @@ class TypstExtractorV2:
 
         table = TableNode(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
         )
+
+        # Parse table attributes
+        table.columns = self._parse_columns_spec(content)
+        table.border_width = self._parse_stroke_spec(content)
+        fill_lambda = self._parse_fill_lambda(content)
+        align_lambda = self._parse_align_lambda(content)
 
         lines = content.split("\n")
 
@@ -292,15 +316,15 @@ class TypstExtractorV2:
                 continue
 
             if "table.header(" in line:
-                header_cells = self._extract_header_cells(line)
+                header_cells = self._extract_header_cells(line, fill_lambda, align_lambda)
                 if header_cells:
                     table.header = TableHeaderNode(
                         id=str(uuid.uuid4()),
                         cells=header_cells,
                     )
                     table.has_header = True
-            elif line.startswith("["):
-                row_cells = self._extract_row_cells(line)
+            elif line.startswith("[") or "table.cell(" in line:
+                row_cells = self._extract_row_cells(line, fill_lambda, align_lambda)
                 if row_cells:
                     table.rows.append(row_cells)
 
@@ -323,7 +347,9 @@ class TypstExtractorV2:
 
         equation = Equation(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
             latex=latex,
             numbering_kind=NumberingKind.EQUATION,
         )
@@ -333,6 +359,41 @@ class TypstExtractorV2:
             self.current_label = None
 
         return equation
+
+    def _extract_outline(self) -> Optional[TOCNode]:
+        """Extract outline (table of contents) from tokens.
+
+        Returns:
+            IR TOCNode or None
+        """
+        token = self.tokens[self.pos]
+        self.pos += 1
+
+        # Extract content until matching closing paren
+        content = self._extract_until_matching_paren()
+
+        # Skip the closing paren token (paren_level went to 0)
+        self.pos += 1
+
+        # Parse title from content if provided
+        title = "Содержание"  # Default title
+
+        # Check for title: "..." parameter
+        import re
+
+        title_match = re.search(r'title\s*:\s*"([^"]+)"', content)
+        if title_match:
+            title = title_match.group(1)
+
+        toc_node = TOCNode(
+            id=str(uuid.uuid4()),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
+            title=title,
+        )
+
+        return toc_node
 
     def _process_label(self) -> None:
         """Process label token."""
@@ -369,11 +430,155 @@ class TypstExtractorV2:
         self.pos += 1
         return None
 
-    def _extract_header_cells(self, line: str) -> list[TableCellNode]:
+    def _parse_columns_spec(self, content: str) -> list[ColSpec]:
+        """Parse columns specification from table content.
+
+        Parses formats like:
+        - columns: 2
+        - columns: (1fr, 2fr)
+        - columns: (17%, 83%)
+        - columns: (auto, 1fr, 20%)
+
+        Args:
+            content: Table content string
+
+        Returns:
+            List of ColSpec objects with width/width_percent/align
+        """
+        import re
+
+        columns: list[ColSpec] = []
+
+        # Pattern: columns: (spec1, spec2, ...)
+        match = re.search(r"columns:\s*\(([^)]+)\)", content)
+        if not match:
+            # Try simple format: columns: 2
+            simple_match = re.search(r"columns:\s*(\d+)", content)
+            if simple_match:
+                num_cols = int(simple_match.group(1))
+                return [ColSpec() for _ in range(num_cols)]
+            return columns
+
+        specs_str = match.group(1)
+        specs = [s.strip() for s in specs_str.split(",")]
+
+        for spec in specs:
+            if not spec:
+                continue
+
+            col_spec = ColSpec()
+
+            # Parse percentage: 17%
+            pct_match = re.match(r"^([\d.]+)%$", spec)
+            if pct_match:
+                col_spec.width_percent = float(pct_match.group(1))
+                columns.append(col_spec)
+                continue
+
+            # Parse fraction: 1fr
+            fr_match = re.match(r"^([\d.]+)fr$", spec)
+            if fr_match:
+                # Store as width (normalized later by writer)
+                col_spec.width = float(fr_match.group(1))
+                columns.append(col_spec)
+                continue
+
+            # Parse auto or align keywords
+            if spec == "auto":
+                columns.append(col_spec)
+            elif spec in ("left", "center", "right", "top", "bottom", "horizon"):
+                col_spec.align = spec
+                columns.append(col_spec)
+            else:
+                # Try combined: 1fr + center (simplified)
+                parts = spec.split()
+                if len(parts) >= 2:
+                    if parts[0].endswith("fr"):
+                        col_spec.width = float(parts[0].replace("fr", ""))
+                    elif parts[0].endswith("%"):
+                        col_spec.width_percent = float(parts[0].replace("%", ""))
+                    if parts[1] in ("left", "center", "right"):
+                        col_spec.align = parts[1]
+                columns.append(col_spec)
+
+        return columns
+
+    def _parse_stroke_spec(self, content: str) -> float:
+        """Parse stroke specification from table content.
+
+        Parses formats like:
+        - stroke: 0.7pt
+        - stroke: 1pt
+
+        Args:
+            content: Table content string
+
+        Returns:
+            Border width in points
+        """
+        import re
+
+        # Pattern: stroke: 0.7pt
+        match = re.search(r"stroke:\s*([0-9.]+)(?:pt|mm)", content)
+        if match:
+            return float(match.group(1))
+        return 0.0
+
+    def _parse_fill_lambda(self, content: str) -> Optional[str]:
+        """Parse fill lambda specification from table content.
+
+        Parses formats like:
+        - fill: (col, row) => if row == 0 { luma(220) }
+        - fill: (col, row) => if row == 0 { rgb("#eee") }
+
+        Args:
+            content: Table content string
+
+        Returns:
+            Fill lambda expression string or None
+        """
+        import re
+
+        # Pattern: fill: (col, row) => if row == 0 { ... }
+        match = re.search(r"fill:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{[^}]+\}", content)
+        if match:
+            return match.group(0)
+        return None
+
+    def _parse_align_lambda(self, content: str) -> Optional[str]:
+        """Parse align lambda specification from table content.
+
+        Parses formats like:
+        - align: (col, row) => if row == 0 { center }
+        - align: (col, row) => if row == 0 { center } else { left }
+
+        Args:
+            content: Table content string
+
+        Returns:
+            Align lambda expression string or None
+        """
+        import re
+
+        # Pattern: align: (col, row) => if row == 0 { ... }
+        match = re.search(
+            r"align:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{([^}]+)\}", content
+        )
+        if match:
+            # Extract alignment value
+            align_value = match.group(1).strip()
+            return align_value
+        return None
+
+    def _extract_header_cells(
+        self, line: str, fill_lambda: Optional[str] = None, align_lambda: Optional[str] = None
+    ) -> list[TableCellNode]:
         """Extract header cells from table header line.
 
         Args:
             line: Table header line
+            fill_lambda: Optional fill lambda expression from table
+            align_lambda: Optional align lambda expression from table
 
         Returns:
             List of IR TableCellNode
@@ -382,30 +587,55 @@ class TypstExtractorV2:
         content = line[line.find("table.header(") + len("table.header(") :]
         content = content.rstrip(")").strip()
 
+        # Extract fill color from lambda if present
+        fill_color = None
+        if fill_lambda:
+            import re
+
+            fill_match = re.search(r"\{\s*(luma|rgb)\(([^)]+)\)", fill_lambda)
+            if fill_match:
+                fill_color = fill_match.group(2)
+
+        col_index = 0
+
         while content.startswith("["):
             end_bracket = content.find("]")
             if end_bracket == -1:
                 break
 
             cell_text = content[1:end_bracket].strip()
+            from typing import cast
+            from ..ir.model import IRNode
+
             cell_content: list[InlineNode] = [
                 TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
             ]
+
+            # Create cell with fill and align
             cell = TableCellNode(
                 id=str(uuid.uuid4()),
-                content=cell_content,
+                content=cast(list[IRNode], cell_content),
+                fill=fill_color,
+                align=align_lambda if col_index == 0 else None,  # Simplified: apply to first column
             )
             cells.append(cell)
+            col_index += 1
 
             content = content[end_bracket + 1 :].strip()
 
         return cells
 
-    def _extract_row_cells(self, line: str) -> list[TableCellNode]:
+    def _extract_row_cells(
+        self, line: str, fill_lambda: Optional[str] = None, align_lambda: Optional[str] = None
+    ) -> list[TableCellNode]:
         """Extract cells from table row line.
+
+        Supports table.cell(colspan: 2)[...] and table.cell(rowspan: 2)[...] patterns.
 
         Args:
             line: Table row line
+            fill_lambda: Optional fill lambda expression from table
+            align_lambda: Optional align lambda expression from table
 
         Returns:
             List of IR TableCellNode
@@ -413,18 +643,44 @@ class TypstExtractorV2:
         cells: list[TableCellNode] = []
         content = line.strip()
 
-        while content.startswith("["):
+        while content.startswith("[") or "table.cell(" in content:
+            colspan = 1
+            rowspan = 1
+
+            # Check for table.cell(colspan: N) or table.cell(rowspan: N)
+            import re
+
+            colspan_match = re.search(r"table\.cell\(colspan:\s*(\d+)\)", content)
+            rowspan_match = re.search(r"table\.cell\(rowspan:\s*(\d+)\)", content)
+
+            if colspan_match:
+                colspan = int(colspan_match.group(1))
+                # Skip past table.cell(colspan: N)[
+                content = content[colspan_match.end() :].strip()
+            elif rowspan_match:
+                rowspan = int(rowspan_match.group(1))
+                # Skip past table.cell(rowspan: N)[
+                content = content[rowspan_match.end() :].strip()
+
+            # Extract cell content
             end_bracket = content.find("]")
             if end_bracket == -1:
                 break
 
             cell_text = content[1:end_bracket].strip()
+            from typing import cast
+            from ..ir.model import IRNode
+
             cell_content: list[InlineNode] = [
                 TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
             ]
+
+            # Create cell with colspan/rowspan
             cell = TableCellNode(
                 id=str(uuid.uuid4()),
-                content=cell_content,
+                content=cast(list[IRNode], cell_content),
+                colspan=colspan,
+                rowspan=rowspan,
             )
             cells.append(cell)
 

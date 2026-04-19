@@ -73,6 +73,17 @@ def convert(
 
 
 def _run_conversion(config: Config) -> dict:
+    """Выполняет конвертацию Typst → DOCX.
+
+    Args:
+        config: Конфигурация конвертации.
+
+    Returns:
+        Словарь со статистикой конвертации.
+
+    Raises:
+        SystemExit: Если strict_mode=True и есть неразрешённые ссылки.
+    """
     loader = TypstProjectLoader(config.input_file)
     files = loader.load()
 
@@ -87,8 +98,34 @@ def _run_conversion(config: Config) -> dict:
             json.dump(ir_json, f, indent=2, ensure_ascii=False)
         console.print(f"[dim]IR dumped to: {json_path}[/dim]")
 
-    writer = DocxWriter(config.reference_doc)
+    writer = DocxWriter(
+        reference_doc=config.reference_doc,
+        math_mode=config.math_mode,
+        ref_labels=config.ref_labels,
+    )
     stats = writer.write(ir_document, config.output_file)
+
+    # Выполняем bidirectional валидацию ссылок
+    import logging
+    logger = logging.getLogger(__name__)
+
+    validation_result = writer.validate_references(ir_document)
+
+    # Логируем результаты валидации
+    for ref in sorted(validation_result.undefined_refs):
+        console.print(f"[yellow]WARNING: Undefined reference: @{ref}[/yellow]")
+
+    if config.debug and validation_result.unreferenced_labels:
+        for label in sorted(validation_result.unreferenced_labels):
+            logger.info(f"Unreferenced label: <{label}>")
+
+    # Проверка strict mode
+    if config.strict_mode and validation_result.has_errors:
+        error_count = len(validation_result.undefined_refs)
+        console.print(
+            f"[red]Error: {error_count} undefined reference(s) found in strict mode[/red]"
+        )
+        raise SystemExit(1)
 
     return stats
 

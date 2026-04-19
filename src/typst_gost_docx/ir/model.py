@@ -32,6 +32,7 @@ class NodeType(str, Enum):
     CROSS_REFERENCE = "cross_reference"
     CROSS_REF = "cross_ref"
     TABLE_HEADER = "table_header"
+    TOC = "toc"
 
 
 class ListKind(str, Enum):
@@ -94,6 +95,8 @@ class Section(BaseNode):
     title: list["IRNode"] = Field(default_factory=list)
     blocks: list["IRNode"] = Field(default_factory=list)
     numbering_kind: Optional[NumberingKind] = NumberingKind.SECTION
+    number: int = 0
+    chapter_number: int = 0
 
 
 class Paragraph(BaseNode):
@@ -212,6 +215,9 @@ class TableNode(BaseNode):
     has_header: bool = False
     caption: Optional["Caption"] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.TABLE
+    number: int = 0
+    chapter_number: int = 0
+    border_width: float = 0.0  # Stroke width in points
 
 
 class Figure(BaseNode):
@@ -221,6 +227,8 @@ class Figure(BaseNode):
     caption: Optional["Caption"] = None
     image_path: Optional[str] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.FIGURE
+    number: int = 0
+    chapter_number: int = 0
 
 
 class Caption(BaseNode):
@@ -229,6 +237,8 @@ class Caption(BaseNode):
     node_type: NodeType = NodeType.PARAGRAPH
     text: str = ""
     numbering_kind: Optional[NumberingKind] = None
+    number: int = 0
+    chapter_number: int = 0
 
 
 class Equation(BaseNode):
@@ -238,6 +248,8 @@ class Equation(BaseNode):
     latex: str = ""
     caption: Optional[Caption] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.EQUATION
+    number: int = 0
+    chapter_number: int = 0
 
 
 class MathNode(BaseNode):
@@ -315,6 +327,22 @@ class CrossRefNode(BaseNode):
     target_label: str = ""
     ref_kind: Optional[str] = None
     ref_text: Optional[str] = None
+    number: int = 0
+    chapter_number: int = 0
+
+
+class TOCNode(BaseNode):
+    """Table of Contents node.
+
+    Represents a #outline() call in Typst that generates a table of contents.
+
+    Attributes:
+        node_type: Node type (toc).
+        title: Title for the TOC (default: "Содержание").
+    """
+
+    node_type: NodeType = NodeType.TOC
+    title: str = "Содержание"
 
 
 class ChapterContext(BaseModel):
@@ -368,6 +396,7 @@ IRNode = (
     | CrossReference
     | CrossRefNode
     | Caption
+    | TOCNode
 )
 
 
@@ -383,3 +412,27 @@ class CrossRefMap(BaseModel):
     def resolve(self, label: str) -> Optional[BaseNode]:
         """Resolve a label to its node."""
         return self.labels.get(label)
+
+
+class ValidationResult(BaseModel):
+    """Результат валидации ссылок и меток.
+
+    Содержит информацию о неопределённых ссылках и неиспользуемых метках.
+
+    Attributes:
+        undefined_refs: Ссылки (@label), которые не имеют определения.
+        unreferenced_labels: Метки (<label>), на которые нет ссылок.
+    """
+
+    undefined_refs: set[str] = Field(default_factory=set)
+    unreferenced_labels: set[str] = Field(default_factory=set)
+
+    @property
+    def has_errors(self) -> bool:
+        """Проверяет наличие ошибок (неопределённых ссылок)."""
+        return bool(self.undefined_refs)
+
+    @property
+    def has_warnings(self) -> bool:
+        """Проверяет наличие предупреждений (неиспользуемых меток)."""
+        return bool(self.unreferenced_labels)

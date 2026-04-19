@@ -12,7 +12,7 @@ def test_minimal_document_load():
 
 This is a paragraph.
 """
-    loader = TypstProjectLoader(Path("test.typ"))
+    _loader = TypstProjectLoader(Path("test.typ"))
     extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
