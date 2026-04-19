@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-04-19T21:20:23.065607",
+  "fixture": "real_vkr",
+  "duration_seconds": 0.019291070368266307,
+  "threshold_seconds": 10.0,
+  "passed": true
+}

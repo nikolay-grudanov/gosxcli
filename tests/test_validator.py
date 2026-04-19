@@ -1,21 +1,19 @@
 """Tests for bidirectional validation of references and labels."""
 
-import pytest
 from typst_gost_docx.parser.validator import ReferenceValidator
 from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 from typst_gost_docx.ir.model import (
-    Document,
-    Section,
-    Paragraph,
-    Figure,
-    TableNode,
-    Equation,
+    Caption,
     CrossReference,
     CrossRefNode,
-    Caption,
-    SourceLocation,
-    TextRun,
+    Document,
+    Equation,
+    Figure,
     NumberingKind,
+    Paragraph,
+    Section,
+    TableNode,
+    TextRun,
 )
 
 

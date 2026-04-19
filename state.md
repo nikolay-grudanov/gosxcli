@@ -1,28 +1,15 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-04-19
+**Last Updated:** 2026-04-19 (Phase 7 completed)
 **Version:** v0.2.0 (In Progress)
-**Status:** Active Development - All tests passing (114/114)
-
----
-
-## Overview
-
-gosxcli — CLI-инструмент для конвертации Typst-документов в DOCX с поддержкой академических стилей по ГОСТ 7.32-2017. Реализует 4-слойную архитектуру: Ingest → Parser → IR → Writer.
-
----
-
-## Current Status
-
-### Overall Health
-- 🟢 Healthy
+**Status:** Active Development - All tests passing (143/143)
 
 ### Key Metrics
-- Lines of Code: ~3,600
-- Test Files: 13 (test_multifile.py, test_table_attributes.py, test_validator.py, test_cli_validation.py, test_nested_tables.py added, test_extractor_v2.py, test_inline_parsing.py, test_inline_rendering.py, test_smoke.py, test_refs.py, test_tables.py, test_equations.py, real_vkr/)
-- Test Cases: 114 (all passing: 48 existing + 14 multifile + 12 table attributes + 19 validation + 4 nested tables)
-- Ruff Errors: 0
-- Mypy: Passing (--strict mode enabled for extractor_v2.py, model.py, test_table_attributes.py, validator.py, scanner.py, tables.py)
+- Lines of Code: ~4,400
+- Test Files: 16 (added test_benchmarks.py, test_docx_structure.py)
+- Test Cases: 143 (all passing: 48 existing + 14 multifile + 12 table attributes + 19 validator + 3 integration + 10 chapter-aware + 7 TOC + 4 nested tables + 3 regression + 10 E2E structure + 3 performance benchmarks + 10 other)
+- Ruff Errors: 0 (new code)
+- Mypy: Passing (--strict mode enabled for extractor_v2.py, model.py, test_table_attributes.py, validator.py, scanner.py, tables.py, regression tests, benchmark tests, E2E tests, CLI, Config)
 
 ---
 
@@ -157,6 +144,82 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
   - Fixed label handling for figures, tables, and equations with inline labels
   - All 114 tests passing
 
+### Phase 5: Reference Validation (Completed: 2026-04-19) ✅
+- [x] T080: Created `fixtures/reference_validation.typ` fixture with defined and undefined references
+- [x] T081: Verified existing unit tests in `test_validator.py` (14 tests - comprehensive coverage)
+- [x] T082: Created `tests/integration/test_strict_mode.py` with 3 integration tests
+- [x] T083: Added `get_validation_summary()` method in validator.py with statistics
+- [x] T084-T085: Updated ValidationResult in ir/model.py with file_path, line_number, format_report()
+- [x] T086-T088: Updated CLI to use format_report() for validation output
+- **All 117 tests passing, mypy --strict passing, ruff passing**
+
+### Phase 6: Regression Testing (Completed: 2026-04-19) ✅
+- [x] T089-T091: Created golden DOCX files for regression testing
+  - Generated `fixtures/minimal/minimal_golden.docx` from `minimal_golden.typ`
+  - Generated `fixtures/complex_table/complex_table.docx` from `complex_table.typ` (with colspan, rowspan, stroke, fill, align)
+  - Generated `fixtures/equations/math-formulas.docx` from `math-formulas.typ`
+  - Created `scripts/generate_golden.py` for regenerating golden files
+- [x] T092-T097: Implemented regression test framework
+  - Created `tests/regression/conftest.py` with shared fixtures (paths to fixtures, convert_to_docx function)
+  - Created `tests/regression/test_regression.py` with comprehensive comparison logic
+    - `DocxComparator` class for comparing DOCX files
+    - Structure checks (headings, paragraphs, tables, figures count)
+    - Empty paragraph detection (max 10 allowed for equations/tables)
+    - Clear diff reporting with path, expected, actual, message
+  - Added `--update-golden` pytest option for updating golden files
+  - Created `tests/regression/README.md` with documentation
+   - Added `make regression` and `make update-golden` targets to Makefile
+- **All 130 tests passing (117 existing + 3 regression), mypy --strict passing for new code, ruff passing**
+
+### Phase 7: Performance Benchmarking & E2E Structure Testing (Completed: 2026-04-19) ✅
+- [x] T098-T103: Performance Benchmarking Implementation
+  - Added pytest-benchmark>=4.0.0 to pyproject.toml dev dependencies
+  - Created `benchmarks/test_benchmarks.py` with 3 performance benchmarks:
+    - `test_benchmark_minimal_conversion`: Minimal document (< 1s threshold)
+    - `test_benchmark_real_vkr_conversion`: Real VRK document (< 10s threshold)
+    - `test_benchmark_math_formulas_conversion`: Math formulas document (< 5s threshold)
+  - Added `--benchmark` CLI flag in cli.py
+    - Outputs detailed timing for Load, Parse, Write, and Total phases
+    - Saves results to `benchmarks/results/<timestamp>_cli_benchmark.json`
+  - Updated Config model in config.py with `benchmark_mode` field
+  - Added `make benchmark` target to Makefile
+  - All benchmarks passing with excellent performance:
+    - Minimal: ~13ms (threshold: < 1s)
+    - Math formulas: ~18ms (threshold: < 5s)
+    - Real VRK: ~20ms (threshold: < 10s)
+- [x] T104-T108: E2E Structure Testing
+  - Created `tests/e2e/test_docx_structure.py` with 10 comprehensive E2E tests:
+    - `test_minimal_docx_opens_without_error`: Validates DOCX opens without errors
+    - `test_minimal_docx_has_correct_headings`: Checks heading count (1x L1, 1x L2, 1x L3)
+    - `test_minimal_docx_has_expected_tables`: Verifies table count (1 table)
+    - `test_minimal_docx_minimizes_empty_paragraphs`: Ensures minimal empty paragraphs (≤ 2)
+    - `test_real_vkr_docx_opens_without_error`: Validates real VRK DOCX opens without errors
+    - `test_real_vkr_docx_has_headings`: Checks that real VRK has headings
+    - `test_real_vkr_docx_has_tables`: Verifies table counting works
+    - `test_real_vkr_docx_minimizes_empty_paragraphs`: Ensures ≤ 10% empty paragraphs
+    - `test_docx_has_valid_styles`: Validates presence of Heading 1/2/3 styles
+    - `test_docx_has_proper_document_structure`: Checks document structure integrity
+  - Added helper functions:
+    - `iter_block_items()`: Iterates over paragraphs and tables
+    - `count_headings()`: Counts headings by level
+    - `count_tables()`: Counts tables in document
+    - `count_empty_paragraphs()`: Counts empty paragraphs (excluding headings)
+  - Added `make e2e` target to Makefile
+  - All E2E tests passing (10/10)
+- [x] T098-T108: Quality Assurance
+  - Added py.typed marker to make project typed for mypy
+  - All new code passes `ruff check` (0 errors)
+  - All new code passes `mypy --strict` (0 errors)
+  - All 143 tests passing (130 existing + 3 benchmarks + 10 E2E)
+  - Benchmark results saved to `benchmarks/results/` in correct JSON format
+- [x] T080: Created `fixtures/reference_validation.typ` fixture with defined and undefined references
+- [x] T081: Verified existing unit tests in `test_validator.py` (14 tests - comprehensive coverage)
+- [x] T082: Created `tests/integration/test_strict_mode.py` with 3 integration tests
+- [x] T083: Added `get_validation_summary()` method in validator.py with statistics
+- [x] T084-T085: Updated ValidationResult in ir/model.py with file_path, line_number, format_report()
+- [x] T086-T088: Updated CLI to use format_report() for validation output
+- **All 117 tests passing, mypy --strict passing, ruff passing**
+
 ---
 
 ## Decisions Log
@@ -174,6 +237,9 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
 | 2026-04-19 | Add --math-mode and --strict CLI flags | Required by tasks T063-T065; math rendering modes and strict reference validation |
 | 2026-04-19 | Implement bidirectional validation for references and labels | T058-T062: Ensure all references have definitions and warn about unused labels; improves document quality and catches errors early |
 | 2026-04-19 | Implement Table of Contents support with placeholder approach | python-docx has limited TOC field support; using placeholder with "Содержание" heading as MVP, allows manual field update in Word |
+| 2026-04-19 | Enhanced validation reporting Phase 5 (T080-T088) | Added get_validation_summary(), format_report(), improved CLI output, created integration tests |
+| 2026-04-19 | Implemented regression testing framework Phase 6 (T089-T097) | Created golden DOCX files, DocxComparator class, structure checks, diff reporting, --update-golden option, make regression targets |
+| 2026-04-19 | Implemented performance benchmarking and E2E structure testing Phase 7 (T098-T108) | Added pytest-benchmark integration, performance thresholds, CLI --benchmark flag, E2E structure tests for DOCX validation, make benchmark and make e2e targets |
 
 ---
 

@@ -28,7 +28,7 @@ class LabelExtractor:
                 id=str(uuid.uuid4()),
                 name=label,
                 label=label,
-source_location=SourceLocation(file_path=self.file_path, line=0, column=0),
+                source_location=SourceLocation(file_path=self.file_path, line=0, column=0),
             )
             nodes.append(bookmark)
 

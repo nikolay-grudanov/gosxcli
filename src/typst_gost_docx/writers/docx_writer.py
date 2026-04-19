@@ -274,9 +274,7 @@ class DocxWriter:
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Failed to render equation as OMML: {e}. Latex: {latex}"
-                )
+                logger.warning(f"Failed to render equation as OMML: {e}. Latex: {latex}")
                 return False
 
         # Логика выбора режима рендеринга
@@ -311,7 +309,9 @@ class DocxWriter:
         # In a full implementation, this would be a TOC field
         # For MVP, we add a placeholder that indicates where TOC should be
         placeholder = self.doc.add_paragraph(style="Normal")
-        placeholder.add_run("[Table of Contents will be generated here - Right-click and select Update Field]")
+        placeholder.add_run(
+            "[Table of Contents will be generated here - Right-click and select Update Field]"
+        )
         placeholder.runs[0].italic = True
         placeholder.runs[0].font.color.rgb = None  # Use default color
 

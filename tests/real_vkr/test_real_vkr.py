@@ -118,6 +118,7 @@ def test_complex_typst_patterns():
     text = files[str(lit_review_path)]
 
     from typst_gost_docx.parser.scanner import TypstScanner
+
     scanner = TypstScanner(text)
     tokens = list(scanner.scan())
 

@@ -45,11 +45,11 @@ Some content.
 
 def test_extractor_outline_with_custom_title() -> None:
     """Test that extractor extracts #outline() with custom title."""
-    text = '''
+    text = """
 #outline(title: "Table of Contents")
 = Introduction
 Some content.
-'''
+"""
     extractor = TypstExtractorV2(text, "test.typ")
     doc = extractor.extract()
 
@@ -76,6 +76,7 @@ Content here.
     assert len(toc_nodes) == 1
 
     from typst_gost_docx.ir.model import Section
+
     sections = [node for node in doc.blocks if isinstance(node, Section)]
     # We have 3 sections: Chapter 1 (level 1), Section 1.1 (level 2), Chapter 2 (level 1)
     assert len(sections) == 3

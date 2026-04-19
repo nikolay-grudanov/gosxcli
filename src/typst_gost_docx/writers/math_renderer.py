@@ -82,9 +82,7 @@ class MathRenderer:
             self.logger.warning(f"Failed to render LaTeX to OMML: {latex[:50]}... Error: {e}")
 
             if self.mode == "native":
-                raise RuntimeError(
-                    f"Failed to render LaTeX in native mode: {e}"
-                ) from e
+                raise RuntimeError(f"Failed to render LaTeX in native mode: {e}") from e
 
             # Fallback mode: return text placeholder
             return self._create_fallback(latex)
@@ -126,14 +124,10 @@ class MathRenderer:
             return element
 
         except Exception as e:
-            self.logger.warning(
-                f"Failed to render LaTeX to element: {latex[:50]}... Error: {e}"
-            )
+            self.logger.warning(f"Failed to render LaTeX to element: {latex[:50]}... Error: {e}")
 
             if self.mode == "native":
-                raise RuntimeError(
-                    f"Failed to render LaTeX to element in native mode: {e}"
-                ) from e
+                raise RuntimeError(f"Failed to render LaTeX to element in native mode: {e}") from e
 
             # Fallback mode: create text element
             return self._create_fallback_element(latex)
@@ -172,9 +166,7 @@ class MathRenderer:
         # Create a minimal valid OMML structure
         element = etree.Element(
             "m:oMathPara",
-            nsmap={
-                "m": "http://schemas.openxmlformats.org/officeDocument/2006/math"
-            },
+            nsmap={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"},
         )
         elem = etree.SubElement(element, "m:oMath")
         r = etree.SubElement(elem, "m:r")

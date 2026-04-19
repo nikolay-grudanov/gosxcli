@@ -271,11 +271,7 @@ class TypstQueryParser:
         try:
             caption_data = data.get("caption", {})
             caption_dict = cast(dict[str, Any], caption_data)
-            caption_text = (
-                caption_dict.get("text", "")
-                if isinstance(caption_data, dict)
-                else ""
-            )
+            caption_text = caption_dict.get("text", "") if isinstance(caption_data, dict) else ""
 
             line = cast(int, data.get("offset", 0)) + 1
 
@@ -329,7 +325,9 @@ class TypstQueryParser:
                 cells = []
                 for cell_obj in header_list:
                     cell_text = cast(dict[str, Any], cell_obj)
-                    text = cell_text.get("text", "") if isinstance(cell_obj, dict) else str(cell_obj)
+                    text = (
+                        cell_text.get("text", "") if isinstance(cell_obj, dict) else str(cell_obj)
+                    )
                     cells.append(
                         TableCellNode(
                             id=str(uuid.uuid4()),
@@ -356,7 +354,11 @@ class TypstQueryParser:
                     row_data = cast(list[object], row_obj)
                     row_cells = []
                     for cell_obj in row_data:
-                        text = cell_text.get("text", "") if isinstance(cell_text, dict) else str(cell_text)
+                        text = (
+                            cell_text.get("text", "")
+                            if isinstance(cell_text, dict)
+                            else str(cell_text)
+                        )
                         row_cells.append(
                             TableCellNode(
                                 id=str(uuid.uuid4()),

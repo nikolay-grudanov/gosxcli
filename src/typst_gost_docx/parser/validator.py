@@ -119,5 +119,34 @@ class ReferenceValidator:
         """
         return self.referenced_labels.copy()
 
+    def get_validation_summary(self) -> dict[str, int]:
+        """Возвращает статистику валидации.
+
+        Returns:
+            Словарь со статистикой:
+                - total_labels: общее количество определённых меток
+                - referenced_count: количество меток, на которые есть ссылки
+                - unreferenced_count: количество меток, на которые нет ссылок
+                - total_refs: общее количество ссылок
+                - defined_count: количество ссылок с определениями
+                - undefined_count: количество ссылок без определений
+        """
+        total_labels = len(self.defined_labels)
+        referenced_count = len(self.defined_labels.keys() & self.referenced_labels)
+        unreferenced_count = len(self.defined_labels.keys() - self.referenced_labels)
+
+        total_refs = len(self.referenced_labels)
+        defined_count = len(self.referenced_labels & self.defined_labels.keys())
+        undefined_count = len(self.referenced_labels - self.defined_labels.keys())
+
+        return {
+            "total_labels": total_labels,
+            "referenced_count": referenced_count,
+            "unreferenced_count": unreferenced_count,
+            "total_refs": total_refs,
+            "defined_count": defined_count,
+            "undefined_count": undefined_count,
+        }
+
 
 __all__ = ["ReferenceValidator"]

@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-04-19T21:14:28.350023",
+  "fixture": "minimal",
+  "duration_seconds": 0.01345799185721011,
+  "threshold_seconds": 1.0,
+  "passed": true
+}

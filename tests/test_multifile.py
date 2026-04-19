@@ -28,14 +28,8 @@ def test_recursive_include_basic() -> None:
         main_file = tmpdir_path / "main.typ"
         chapter_file = tmpdir_path / "chapter.typ"
 
-        main_file.write_text(
-            '#include "chapter.typ"\n\n= Main\n\nContent.\n',
-            encoding="utf-8"
-        )
-        chapter_file.write_text(
-            "== Chapter\n\nChapter content.\n",
-            encoding="utf-8"
-        )
+        main_file.write_text('#include "chapter.typ"\n\n= Main\n\nContent.\n', encoding="utf-8")
+        chapter_file.write_text("== Chapter\n\nChapter content.\n", encoding="utf-8")
 
         loader = TypstProjectLoader(main_file)
         files = loader.load()
@@ -56,8 +50,7 @@ def test_multiple_includes() -> None:
         ch3 = tmpdir_path / "ch3.typ"
 
         main_file.write_text(
-            '#include "ch1.typ"\n#include "ch2.typ"\n#include "ch3.typ"\n',
-            encoding="utf-8"
+            '#include "ch1.typ"\n#include "ch2.typ"\n#include "ch3.typ"\n', encoding="utf-8"
         )
         ch1.write_text("= Chapter 1\n", encoding="utf-8")
         ch2.write_text("= Chapter 2\n", encoding="utf-8")
@@ -141,7 +134,7 @@ def test_max_depth_protection() -> None:
             file_path = tmpdir_path / f"file{i}.typ"
             if i > 0:
                 # Каждый файл включает предыдущий
-                file_path.write_text(f'#include "file{i-1}.typ"\n', encoding="utf-8")
+                file_path.write_text(f'#include "file{i - 1}.typ"\n', encoding="utf-8")
             else:
                 file_path.write_text("= End\n", encoding="utf-8")
             files.append(file_path)
@@ -161,10 +154,7 @@ def test_include_in_comment() -> None:
         main_file = tmpdir_path / "main.typ"
         other_file = tmpdir_path / "other.typ"
 
-        main_file.write_text(
-            '// #include "other.typ"\n\n= Main\n',
-            encoding="utf-8"
-        )
+        main_file.write_text('// #include "other.typ"\n\n= Main\n', encoding="utf-8")
         other_file.write_text("= Other\n", encoding="utf-8")
 
         loader = TypstProjectLoader(main_file)
@@ -251,10 +241,7 @@ def test_include_with_quotes() -> None:
         file1 = tmpdir_path / "file1.typ"
         file2 = tmpdir_path / "file2.typ"
 
-        main_file.write_text(
-            '#include "file1.typ"\n#include \'file2.typ\'\n',
-            encoding="utf-8"
-        )
+        main_file.write_text("#include \"file1.typ\"\n#include 'file2.typ'\n", encoding="utf-8")
         file1.write_text("= File 1\n", encoding="utf-8")
         file2.write_text("= File 2\n", encoding="utf-8")
 
@@ -288,10 +275,7 @@ def test_duplicate_includes() -> None:
         main_file = tmpdir_path / "main.typ"
         shared_file = tmpdir_path / "shared.typ"
 
-        main_file.write_text(
-            '#include "shared.typ"\n#include "shared.typ"\n',
-            encoding="utf-8"
-        )
+        main_file.write_text('#include "shared.typ"\n#include "shared.typ"\n', encoding="utf-8")
         shared_file.write_text("= Shared\n", encoding="utf-8")
 
         loader = TypstProjectLoader(main_file)

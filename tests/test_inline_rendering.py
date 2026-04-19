@@ -225,7 +225,9 @@ def test_inline_paragraph_rendering() -> None:
 
         # Check combined bold+italic
         bold_italic_runs = [r for r in runs if r.bold and r.italic]
-        assert len(bold_italic_runs) == 1, f"Expected 1 bold+italic run, found {len(bold_italic_runs)}"
+        assert len(bold_italic_runs) == 1, (
+            f"Expected 1 bold+italic run, found {len(bold_italic_runs)}"
+        )
         assert bold_italic_runs[0].text == "bold italic"
 
         # Check code font

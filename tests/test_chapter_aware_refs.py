@@ -65,7 +65,7 @@ def test_ref_resolver_infer_ref_kind():
 
 def test_ref_resolver_cross_ref_node():
     """Test that RefResolver populates CrossRefNode correctly."""
-    from typst_gost_docx.ir.model import CrossRefMap, BaseNode
+    from typst_gost_docx.ir.model import CrossRefMap
 
     # Create a labeled figure
     figure = Figure(
@@ -146,8 +146,6 @@ def test_docx_writer_format_cross_ref():
 
 def test_docx_writer_write_caption():
     """Test that DocxWriter formats captions with chapter-aware numbering."""
-    from unittest.mock import MagicMock
-
     ref_labels = RefLabels(
         figure="Рис.",
         table="Табл.",
@@ -158,6 +156,7 @@ def test_docx_writer_write_caption():
 
     # Mock document to test caption formatting without creating real DOCX
     from docx import Document
+
     writer.doc = Document()
 
     # Test figure caption
@@ -211,7 +210,6 @@ def test_docx_writer_infer_ref_kind():
 
 def test_figure_and_caption_numbering():
     """Test that figures get correct numbers and chapter numbers."""
-    from unittest.mock import MagicMock
     from docx import Document
     from typst_gost_docx.ir.model import TextRun
 
@@ -266,7 +264,6 @@ def test_figure_and_caption_numbering():
 
 def test_table_and_caption_numbering():
     """Test that tables get correct numbers and chapter numbers."""
-    from unittest.mock import MagicMock
     from docx import Document
     from typst_gost_docx.ir.model import ColSpec, TextRun
 
@@ -323,7 +320,6 @@ def test_table_and_caption_numbering():
 
 def test_equation_and_caption_numbering():
     """Test that equations get correct numbers and chapter numbers."""
-    from unittest.mock import MagicMock
     from docx import Document
     from typst_gost_docx.ir.model import TextRun
 

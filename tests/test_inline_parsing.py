@@ -23,10 +23,7 @@ class TestInlineParsing:
 
         runs = paragraphs[0].runs
         # Find the bold run
-        bold_runs = [
-            r for r in runs
-            if isinstance(r, InlineRunNode) and r.bold is True
-        ]
+        bold_runs = [r for r in runs if isinstance(r, InlineRunNode) and r.bold is True]
         assert len(bold_runs) == 1
         assert bold_runs[0].text == "bold"
 
@@ -47,10 +44,7 @@ class TestInlineParsing:
 
         runs = paragraphs[0].runs
         # Find the italic run
-        italic_runs = [
-            r for r in runs
-            if isinstance(r, InlineRunNode) and r.italic is True
-        ]
+        italic_runs = [r for r in runs if isinstance(r, InlineRunNode) and r.italic is True]
         assert len(italic_runs) == 1
         assert italic_runs[0].text == "italic"
 
@@ -71,10 +65,7 @@ class TestInlineParsing:
 
         runs = paragraphs[0].runs
         # Find the code node
-        code_nodes = [
-            r for r in runs
-            if isinstance(r, InlineCodeNode)
-        ]
+        code_nodes = [r for r in runs if isinstance(r, InlineCodeNode)]
         assert len(code_nodes) == 1
         assert code_nodes[0].code == "function()"
 
@@ -96,26 +87,17 @@ class TestInlineParsing:
         runs = paragraphs[0].runs
 
         # Check for bold
-        bold_runs = [
-            r for r in runs
-            if isinstance(r, InlineRunNode) and r.bold is True
-        ]
+        bold_runs = [r for r in runs if isinstance(r, InlineRunNode) and r.bold is True]
         assert len(bold_runs) == 1
         assert bold_runs[0].text == "bold"
 
         # Check for italic
-        italic_runs = [
-            r for r in runs
-            if isinstance(r, InlineRunNode) and r.italic is True
-        ]
+        italic_runs = [r for r in runs if isinstance(r, InlineRunNode) and r.italic is True]
         assert len(italic_runs) == 1
         assert italic_runs[0].text == "italic"
 
         # Check for code
-        code_nodes = [
-            r for r in runs
-            if isinstance(r, InlineCodeNode)
-        ]
+        code_nodes = [r for r in runs if isinstance(r, InlineCodeNode)]
         assert len(code_nodes) == 1
         assert code_nodes[0].code == "code"
 
@@ -162,18 +144,12 @@ class TestInlineParsing:
         runs = paragraphs[0].runs
 
         # Find bold run
-        bold_runs = [
-            r for r in runs
-            if isinstance(r, InlineRunNode) and r.bold is True
-        ]
+        bold_runs = [r for r in runs if isinstance(r, InlineRunNode) and r.bold is True]
         assert len(bold_runs) == 1
         assert bold_runs[0].text == "Figure 1"
 
         # Find cross reference
-        refs = [
-            r for r in runs
-            if isinstance(r, CrossReference)
-        ]
+        refs = [r for r in runs if isinstance(r, CrossReference)]
         assert len(refs) == 1
         assert refs[0].target_label == "fig-1"
 

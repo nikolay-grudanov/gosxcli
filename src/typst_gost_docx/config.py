@@ -59,6 +59,7 @@ class Config(BaseModel):
         math_mode: Math rendering mode (native, image, or fallback).
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR).
         ref_labels: Localized reference label names for GOST formatting.
+        benchmark_mode: Enable benchmark mode for performance measurement.
     """
 
     input_file: Path
@@ -72,6 +73,7 @@ class Config(BaseModel):
     math_mode: MathMode = MathMode.FALLBACK
     log_level: str = "INFO"
     ref_labels: RefLabels = Field(default_factory=RefLabels)
+    benchmark_mode: bool = False
 
     def model_post_init(self, __context: object) -> None:
         """Initialize assets_dir after model construction."""

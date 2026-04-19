@@ -426,10 +426,14 @@ class ValidationResult(BaseModel):
     Attributes:
         undefined_refs: Ссылки (@label), которые не имеют определения.
         unreferenced_labels: Метки (<label>), на которые нет ссылок.
+        file_path: Путь к файлу для отчёта (опционально).
+        line_number: Номер строки для отчёта (опционально).
     """
 
     undefined_refs: set[str] = Field(default_factory=set)
     unreferenced_labels: set[str] = Field(default_factory=set)
+    file_path: Optional[str] = None
+    line_number: Optional[int] = None
 
     @property
     def has_errors(self) -> bool:
@@ -440,3 +444,39 @@ class ValidationResult(BaseModel):
     def has_warnings(self) -> bool:
         """Проверяет наличие предупреждений (неиспользуемых меток)."""
         return bool(self.unreferenced_labels)
+
+    def format_report(self) -> str:
+        """Форматирует отчёт о валидации в читаемый текст.
+
+        Returns:
+            Строка с форматированным отчётом о проблемах.
+        """
+        lines: list[str] = []
+
+        # Добавляем информацию о файле, если доступна
+        if self.file_path:
+            location = f"{self.file_path}"
+            if self.line_number is not None:
+                location += f":{self.line_number}"
+            lines.append(f"Validation report for {location}")
+            lines.append("")
+
+        # Выводим неопределённые ссылки (ошибки)
+        if self.undefined_refs:
+            lines.append("Undefined references (errors):")
+            for ref in sorted(self.undefined_refs):
+                lines.append(f"  WARNING: @{ref}")
+            lines.append("")
+
+        # Выводим неиспользуемые метки (предупреждения)
+        if self.unreferenced_labels:
+            lines.append("Unreferenced labels (info):")
+            for label in sorted(self.unreferenced_labels):
+                lines.append(f"  INFO: <{label}>")
+            lines.append("")
+
+        # Если нет проблем
+        if not self.undefined_refs and not self.unreferenced_labels:
+            lines.append("No validation issues found.")
+
+        return "\n".join(lines)

@@ -1,16 +1,21 @@
 """Интеграционный тест bidirectional validation в CLI."""
 
-import pytest
 import sys
 from pathlib import Path
 
 # Добавляем src в путь для импорта
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from typst_gost_docx.ir.model import Document, Paragraph, Figure, Caption, CrossReference, NumberingKind, TextRun
+from typst_gost_docx.ir.model import (
+    Caption,
+    CrossReference,
+    Document,
+    Figure,
+    NumberingKind,
+    Paragraph,
+    TextRun,
+)
 from typst_gost_docx.writers.docx_writer import DocxWriter
-from typst_gost_docx.config import Config, MathMode
-from typst_gost_docx.parser.validator import ReferenceValidator
 
 
 def test_cli_validation_with_undefined_ref():
@@ -109,7 +114,7 @@ def test_cli_validation_stats_update():
     writer = DocxWriter()
     initial_stats = writer.stats.copy()
 
-    validation_result = writer.validate_references(doc)
+    writer.validate_references(doc)
 
     # Проверяем что статистика обновилась
     assert writer.stats["refs_unresolved"] == 2
