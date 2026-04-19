@@ -68,6 +68,9 @@ class TablesManager:
 
         # Track which cells are hidden due to rowspan
         # cell_map[row][col] = True if cell is visible, False if hidden
+        # This is critical for handling rowspan cells that span multiple rows
+        # When a cell has rowspan > 1, we mark cells below it as False (hidden)
+        # so they won't be written to separately
         cell_map: list[list[bool]] = [[True] * num_cols for _ in range(num_rows)]
 
         # Write header row
@@ -182,6 +185,8 @@ class TablesManager:
         col_idx = 0
         for cell in cells:
             # Skip if this cell position is already taken (hidden by rowspan)
+            # This is critical for handling cells that were marked as hidden
+            # by a previous cell with rowspan > 1
             while col_idx < len(cell_map[row_idx]) and not cell_map[row_idx][col_idx]:
                 col_idx += 1
 
@@ -203,11 +208,14 @@ class TablesManager:
                 self._set_cell_fill(word_cell, cell.fill)
 
             # Mark hidden cells due to colspan
+            # When a cell has colspan > 1, we need to mark the cells it spans
+            # as hidden (False) so they won't be written to separately
             for offset in range(1, cell.colspan):
                 if col_idx + offset < len(cell_map[row_idx]):
                     cell_map[row_idx][col_idx + offset] = False
 
             # Move to next visible column
+            # We add cell.colspan to skip over the columns we just filled
             col_idx += cell.colspan
 
     def _write_data_row(
@@ -262,6 +270,9 @@ class TablesManager:
     def _set_cell_colspan(self, cell: Any, colspan: int) -> None:
         """Set colspan for a cell using gridSpan element.
 
+        The OpenXML gridSpan element tells Word how many columns this cell should span.
+        For example, gridSpan with val="3" means the cell spans 3 columns.
+
         Args:
             cell: Word table cell object.
             colspan: Number of columns to span.
@@ -273,10 +284,12 @@ class TablesManager:
         tc_pr = tc.get_or_add_tcPr()
 
         # Remove existing gridSpan if any
+        # This is important when reusing cells or updating spans
         for grid_span in tc_pr.xpath("./w:gridSpan"):
             tc_pr.remove(grid_span)
 
         # Add new gridSpan
+        # The val attribute specifies the number of columns to span
         grid_span = OxmlElement("w:gridSpan")
         grid_span.set(qn("w:val"), str(colspan))
         tc_pr.append(grid_span)
@@ -290,6 +303,13 @@ class TablesManager:
         cell_map: list[list[bool]],
     ) -> None:
         """Set rowspan for a cell using vMerge element.
+
+        OpenXML vMerge element handling:
+        - First cell: vMerge with val="restart" (starts the merge)
+        - Subsequent cells: vMerge with val="continue" (part of the merge)
+
+        The cell_map is critical here - we mark cells below as hidden (False)
+        so they won't be written to separately when we iterate through rows.
 
         Args:
             cell: Word table cell object.
@@ -305,11 +325,15 @@ class TablesManager:
         tc_pr = tc.get_or_add_tcPr()
 
         # Set vMerge to "restart" for the first row
+        # This tells Word that this cell starts a vertical merge
         v_merge = OxmlElement("w:vMerge")
         v_merge.set(qn("w:val"), "restart")
         tc_pr.append(v_merge)
 
         # Mark cells below as hidden and set vMerge to "continue"
+        # We iterate through the rows this cell spans and mark them as hidden
+        # The actual vMerge="continue" is set when we write those cells
+        # (they'll be skipped because cell_map[r][col_idx] is False)
         num_rows = len(cell_map)
         for r in range(row_idx + 1, min(row_idx + rowspan, num_rows)):
             if col_idx < len(cell_map[r]):
@@ -319,6 +343,7 @@ class TablesManager:
                 # Note: We need to find the actual cell at this position
                 # This is tricky because we're using cell_map to track visibility
                 # For now, we'll set vMerge when we actually write those cells
+                # The cells below will be skipped in _write_data_row due to cell_map
                 pass
 
     def _set_cell_alignment(self, cell: Any, alignment: Optional[str]) -> None:

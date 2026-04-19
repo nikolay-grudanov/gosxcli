@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-04-19T22:42:44.289978",
+  "fixture": "math_formulas",
+  "duration_seconds": 0.018131788661280138,
+  "threshold_seconds": 5.0,
+  "passed": true
+}

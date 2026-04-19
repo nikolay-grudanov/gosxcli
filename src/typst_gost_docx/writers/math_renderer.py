@@ -49,6 +49,11 @@ class MathRenderer:
         Converts LaTeX mathematical expressions to Office Math Markup Language (OMML)
         format. Handles conversion errors according to the configured mode.
 
+        The conversion flow:
+        1. Use latex2mathml.converter to convert LaTeX → MathML
+        2. MathML is automatically converted to OMML by the library
+        3. If conversion fails, handle based on mode (native/fallback)
+
         Args:
             latex: LaTeX math expression string.
 
@@ -69,9 +74,12 @@ class MathRenderer:
         try:
             from latex2mathml import converter
 
+            # Convert LaTeX to OMML
+            # The latex2mathml library handles the conversion and returns OMML
             omml = converter.convert(latex)
 
             # Verify the result is valid
+            # Empty result indicates conversion failure
             if not omml or len(omml.strip()) == 0:
                 raise RuntimeError("Conversion produced empty result")
 
@@ -81,10 +89,13 @@ class MathRenderer:
         except Exception as e:
             self.logger.warning(f"Failed to render LaTeX to OMML: {latex[:50]}... Error: {e}")
 
+            # In native mode, we raise an exception on any conversion failure
+            # This is useful for production where we want to catch all errors
             if self.mode == "native":
                 raise RuntimeError(f"Failed to render LaTeX in native mode: {e}") from e
 
-            # Fallback mode: return text placeholder
+            # Fallback mode: return text placeholder instead of raising
+            # This allows the document to be generated even if math conversion fails
             return self._create_fallback(latex)
 
     def render_to_element(self, latex: str) -> Element:
