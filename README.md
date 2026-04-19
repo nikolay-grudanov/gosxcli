@@ -198,6 +198,43 @@ typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib 
 - Inproceedings: Автор В.В. Название // Труды конференции. — Год. — С. XX-XX.
 - Author-year style: Автор А.А. (Год) Название // Журнал. — С. XX-XX.
 
+### Code Blocks
+```typst
+#block(
+  fill: rgb("#f0f0f0"),
+  inset: 10pt,
+  [
+    ```python
+    def hello_world():
+        print("Hello, World!")
+    ```
+
+    ```rust
+    fn main() {
+        println!("Hello, World!");
+    }
+    ```
+  ]
+)
+```
+
+**Features:**
+- Multi-line code blocks with language specification
+- Monospace font (Courier New) for code
+- Background shading (light gray #F0F0F0)
+- XML special character escaping (<, >, &)
+- Preserved indentation and line breaks
+- Small font size (9pt) for code blocks
+
+**Supported languages:**
+- Python: ```python
+- Rust: ```rust
+- JavaScript: ```javascript
+- C: ```c
+- C++: ```cpp
+- Plain text: ``` (no language specified)
+- Any custom identifier: ```yourlanguage
+
 ## Architecture
 
 The converter uses a 4-layer pipeline:

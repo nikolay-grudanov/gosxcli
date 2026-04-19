@@ -23,6 +23,7 @@ from ..ir.model import (
     TextRun,
     InlineRunNode,
     InlineCodeNode,
+    CodeBlockNode,
     NumberingKind,
     ListKind,
     CitationStyle,
@@ -108,6 +109,8 @@ class DocxWriter:
             self._write_toc(block)
         elif isinstance(block, BibliographySection):
             self._write_bibliography(block)
+        elif isinstance(block, CodeBlockNode):
+            self._write_code_block(block)
         elif isinstance(block, CrossReference):
             pass
 
@@ -811,6 +814,68 @@ class DocxWriter:
 
         para = self.doc.add_paragraph(style="Caption")
         para.add_run(formatted)
+
+    def _write_code_block(self, code_block: CodeBlockNode) -> None:
+        """Записывает блок кода в документ.
+
+        Использует моноширинный шрифт (Courier New/Consolas) для отображения кода.
+        Сохраняет отступы и переносы строк. Экранирует XML спецсимволы.
+
+        Args:
+            code_block: IR узел блока кода.
+        """
+        from docx.shared import Pt
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+
+        # Разбиваем содержимое на строки
+        lines = code_block.content.split("\n")
+
+        # Применяем фоновое затенение к каждому параграфу кода
+        for line in lines:
+            # Создаем параграф для каждой строки кода
+            para = self.doc.add_paragraph(style="Normal")
+
+            # Применяем фоновое затенение (серый цвет)
+            # Добавляем shading через OxmlElement
+            shading_elm = OxmlElement("w:shd")
+            shading_elm.set(qn("w:fill"), "F0F0F0")  # Светло-серый цвет
+            para._element.get_or_add_pPr().insert_element_before(
+                shading_elm, "w:spacing" if para._element.pPr is not None else None
+            )
+
+            # Экранируем XML спецсимволы и добавляем текст
+            escaped_line = self._escape_xml_text(line)
+            run = para.add_run(escaped_line)
+
+            # Применяем моноширинный шрифт
+            run.font.name = "Courier New"
+            # Устанавливаем шрифт для East Asian characters (для совместимости)
+            run._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
+            run.font.size = Pt(9)  # Мелкий шрифт для кода
+
+            # Удаляем интерлиньяж (межстрочный интервал)
+            para.paragraph_format.space_before = Pt(0)
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.line_spacing = 1.0  # Одиночный интервал
+
+    def _escape_xml_text(self, text: str) -> str:
+        """Экранирует XML спецсимволы для безопасного использования в DOCX.
+
+        Экранирует символы: & → &amp;, < → &lt;, > → &gt;
+        Это необходимо для корректного XML well-formed output.
+
+        Args:
+            text: Текст для экранирования.
+
+        Returns:
+            Экранированный текст, безопасный для XML/DOCX.
+        """
+        # Порядок важен: сначала & (чтобы не экранировать уже экранированные)
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        return text
 
     def _nodes_to_text(self, nodes: list[BaseNode]) -> str:
         text_parts = []

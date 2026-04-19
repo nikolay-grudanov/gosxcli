@@ -35,6 +35,7 @@ class NodeType(str, Enum):
     TOC = "toc"
     CITATION = "citation"
     BIBLIOGRAPHY_SECTION = "bibliography_section"
+    CODE_BLOCK = "code_block"
 
 
 class ListKind(str, Enum):
@@ -442,6 +443,23 @@ class BibliographySection(BaseNode):
     style: CitationStyle = CitationStyle.NUMERIC
 
 
+class CodeBlockNode(BaseNode):
+    """Code block node with syntax highlighting info.
+
+    Represents a multi-line code block from Typst document with optional
+    language identifier for syntax highlighting.
+
+    Attributes:
+        node_type: Node type (code_block).
+        content: Raw code content.
+        language: Language identifier (python, rust, c++, etc.) or None.
+    """
+
+    node_type: NodeType = NodeType.CODE_BLOCK
+    content: str = ""
+    language: Optional[str] = None
+
+
 class ChapterContext(BaseModel):
     """Context for chapter-aware numbering.
 
@@ -497,6 +515,7 @@ IRNode = (
     | TOCNode
     | CitationNode
     | BibliographySection
+    | CodeBlockNode
 )
 
 
