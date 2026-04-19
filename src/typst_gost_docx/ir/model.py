@@ -1,11 +1,18 @@
-"""Intermediate Representation models for document conversion."""
+"""Intermediate Representation models for document conversion.
 
-from dataclasses import dataclass, field
-from typing import Any, Optional
+This module defines the IR (Intermediate Representation) data structures
+for converting Typst documents to DOCX format.
+"""
+
 from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
 
 
 class NodeType(str, Enum):
+    """Types of nodes in the IR tree."""
+
     DOCUMENT = "document"
     SECTION = "section"
     PARAGRAPH = "paragraph"
@@ -16,168 +23,363 @@ class NodeType(str, Enum):
     TABLE_CELL = "table_cell"
     FIGURE = "figure"
     EQUATION = "equation"
+    MATH = "math"
     TEXT_RUN = "text_run"
-    EMPHASIS = "emphasis"
-    STRONG = "strong"
+    INLINE_RUN = "inline_run"
     INLINE_CODE = "inline_code"
+    INLINE_MATH = "inline_math"
     BOOKMARK = "bookmark"
     CROSS_REFERENCE = "cross_reference"
+    CROSS_REF = "cross_ref"
+    TABLE_HEADER = "table_header"
 
 
 class ListKind(str, Enum):
+    """Kind of list (bullet or numbered)."""
+
     BULLET = "bullet"
     NUMBERED = "numbered"
 
 
 class NumberingKind(str, Enum):
+    """Numbering kind for figures, tables, equations, sections."""
+
     FIGURE = "figure"
     TABLE = "table"
     EQUATION = "equation"
     SECTION = "section"
 
 
-@dataclass
-class SourceLocation:
+class MathRenderMode(str, Enum):
+    """Rendering mode for mathematical expressions."""
+
+    NATIVE = "native"
+    IMAGE = "image"
+    FALLBACK = "fallback"
+
+
+class SourceLocation(BaseModel):
+    """Source location information for debugging."""
+
     file_path: str
     line: int
-    column: int
+    column: int = 0
     end_line: Optional[int] = None
     end_column: Optional[int] = None
 
 
-@dataclass
-class BaseNode:
+class BaseNode(BaseModel):
+    """Base class for all IR nodes."""
+
     id: str = ""
     node_type: NodeType = NodeType.DOCUMENT
     label: Optional[str] = None
     source_location: Optional[SourceLocation] = None
-    style_hints: dict[str, Any] = field(default_factory=dict)
+    style_hints: dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
 class Document(BaseNode):
+    """Root document node."""
+
     node_type: NodeType = NodeType.DOCUMENT
-    metadata: dict[str, Any] = field(default_factory=dict)
-    blocks: list[BaseNode] = field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    blocks: list["IRNode"] = Field(default_factory=list)
 
 
-@dataclass
 class Section(BaseNode):
+    """Section or heading node."""
+
     node_type: NodeType = NodeType.SECTION
     level: int = 1
-    title: list[BaseNode] = field(default_factory=list)
-    blocks: list[BaseNode] = field(default_factory=list)
+    title: list["IRNode"] = Field(default_factory=list)
+    blocks: list["IRNode"] = Field(default_factory=list)
     numbering_kind: Optional[NumberingKind] = NumberingKind.SECTION
 
 
-@dataclass
 class Paragraph(BaseNode):
+    """Paragraph node with inline runs.
+
+    Uses a list of InlineNode runs instead of plain text content
+    to support inline formatting (bold, italic, underline, code, math).
+
+    Provides backward compatibility for code that accesses `content` field
+    by reconstructing text from runs when explicit content is not set.
+
+    Attributes:
+        node_type: Node type (paragraph).
+        runs: List of inline nodes for rich text formatting.
+    """
+
     node_type: NodeType = NodeType.PARAGRAPH
-    content: list[BaseNode] = field(default_factory=list)
+    runs: list["InlineNode"] = Field(default_factory=list)
+    _content: str = ""
+
+    @property
+    def content(self) -> str:
+        """Get paragraph text content.
+
+        Returns explicit content if set, otherwise reconstructs from runs.
+
+        Returns:
+            The text content of the paragraph.
+        """
+        if self._content:
+            return self._content
+        if self.runs:
+            return "".join(self._extract_text_from_run(run) for run in self.runs)
+        return ""
+
+    @content.setter
+    def content(self, value: str) -> None:
+        """Set paragraph text content.
+
+        Args:
+            value: The text content to set.
+        """
+        self._content = value
+
+    @staticmethod
+    def _extract_text_from_run(node: "InlineNode") -> str:
+        """Extract text from an inline node.
+
+        Args:
+            node: An inline node (TextRun, InlineRunNode, InlineCodeNode, etc).
+
+        Returns:
+            The text content of the node.
+        """
+        if hasattr(node, "text"):
+            return node.text
+        if hasattr(node, "code"):
+            return node.code
+        if hasattr(node, "latex"):
+            return node.latex
+        if hasattr(node, "name"):
+            return node.name
+        if hasattr(node, "target_label"):
+            return node.target_label or ""
+        return ""
 
 
-@dataclass
 class ListBlock(BaseNode):
+    """List block node."""
+
     node_type: NodeType = NodeType.LIST_BLOCK
     kind: ListKind = ListKind.BULLET
-    items: list["ListItem"] = field(default_factory=list)
+    items: list["ListItem"] = Field(default_factory=list)
 
 
-@dataclass
 class ListItem(BaseNode):
+    """List item node."""
+
     node_type: NodeType = NodeType.LIST_ITEM
-    content: list[BaseNode] = field(default_factory=list)
+    content: list["IRNode"] = Field(default_factory=list)
 
 
-@dataclass
-class Table(BaseNode):
+class ColSpec(BaseModel):
+    """Column specification for tables."""
+
+    width: Optional[float] = None
+    width_percent: Optional[float] = None
+    align: Optional[str] = None
+
+
+class TableHeaderNode(BaseNode):
+    """Table header row node."""
+
+    node_type: NodeType = NodeType.TABLE_HEADER
+    cells: list["TableCellNode"] = Field(default_factory=list)
+
+
+class TableCellNode(BaseNode):
+    """Table cell node with colspan/rowspan support."""
+
+    node_type: NodeType = NodeType.TABLE_CELL
+    content: list["IRNode"] = Field(default_factory=list)
+    colspan: int = 1
+    rowspan: int = 1
+    align: Optional[str] = None
+    fill: Optional[str] = None
+
+
+class TableNode(BaseNode):
+    """Table node with column specifications."""
+
     node_type: NodeType = NodeType.TABLE
-    rows: list["TableRow"] = field(default_factory=list)
+    columns: list[ColSpec] = Field(default_factory=list)
+    header: Optional[TableHeaderNode] = None
+    rows: list[list["TableCellNode"]] = Field(default_factory=list)
     has_header: bool = False
     caption: Optional["Caption"] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.TABLE
 
 
-@dataclass
-class TableRow(BaseNode):
-    node_type: NodeType = NodeType.TABLE_ROW
-    cells: list["TableCell"] = field(default_factory=list)
-
-
-@dataclass
-class TableCell(BaseNode):
-    node_type: NodeType = NodeType.TABLE_CELL
-    content: list[BaseNode] = field(default_factory=list)
-    colspan: int = 1
-    rowspan: int = 1
-
-
-@dataclass
 class Figure(BaseNode):
+    """Figure node."""
+
     node_type: NodeType = NodeType.FIGURE
     caption: Optional["Caption"] = None
     image_path: Optional[str] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.FIGURE
 
 
-@dataclass
 class Caption(BaseNode):
+    """Caption for figures, tables, equations."""
+
     node_type: NodeType = NodeType.PARAGRAPH
     text: str = ""
     numbering_kind: Optional[NumberingKind] = None
 
 
-@dataclass
 class Equation(BaseNode):
+    """Block equation node."""
+
     node_type: NodeType = NodeType.EQUATION
     latex: str = ""
     caption: Optional[Caption] = None
     numbering_kind: Optional[NumberingKind] = NumberingKind.EQUATION
 
 
-@dataclass
+class MathNode(BaseNode):
+    """Math expression node with rendering mode.
+
+    Represents a mathematical expression (inline or block) in the document.
+    Supports different rendering modes and tracks rendering errors.
+
+    Attributes:
+        content: The LaTeX content of the mathematical expression.
+        render_mode: Rendering mode - "native" for OMML, "image" for image fallback,
+            "fallback" for text fallback when rendering fails.
+        render_error: Error message if rendering failed, None otherwise.
+        display_mode: Whether this is a block equation (display math) vs inline.
+    """
+
+    node_type: NodeType = NodeType.MATH
+    content: str = ""
+    display_mode: bool = False
+    render_mode: MathRenderMode = MathRenderMode.NATIVE
+    render_error: Optional[str] = None
+
+
 class TextRun(BaseNode):
+    """Plain text run node."""
+
     node_type: NodeType = NodeType.TEXT_RUN
     text: str = ""
 
 
-@dataclass
-class Emphasis(BaseNode):
-    node_type: NodeType = NodeType.EMPHASIS
-    content: list[BaseNode] = field(default_factory=list)
+class InlineRunNode(BaseNode):
+    """Inline text run with formatting."""
+
+    node_type: NodeType = NodeType.INLINE_RUN
+    text: str = ""
+    bold: bool = False
+    italic: bool = False
+    underline: bool = False
 
 
-@dataclass
-class Strong(BaseNode):
-    node_type: NodeType = NodeType.STRONG
-    content: list[BaseNode] = field(default_factory=list)
+class InlineCodeNode(BaseNode):
+    """Inline code node."""
 
-
-@dataclass
-class InlineCode(BaseNode):
     node_type: NodeType = NodeType.INLINE_CODE
     code: str = ""
 
 
-@dataclass
+class InlineMathNode(BaseNode):
+    """Inline math expression."""
+
+    node_type: NodeType = NodeType.INLINE_MATH
+    latex: str = ""
+    render_mode: MathRenderMode = MathRenderMode.NATIVE
+
+
 class Bookmark(BaseNode):
+    """Bookmark node for DOCX references."""
+
     node_type: NodeType = NodeType.BOOKMARK
     name: str = ""
 
 
-@dataclass
 class CrossReference(BaseNode):
+    """Legacy cross-reference node."""
+
     node_type: NodeType = NodeType.CROSS_REFERENCE
     target_label: str = ""
     ref_text: Optional[str] = None
 
 
-@dataclass
-class CrossRefMap:
-    labels: dict[str, BaseNode] = field(default_factory=dict)
+class CrossRefNode(BaseNode):
+    """Cross-reference node with chapter-aware numbering."""
+
+    node_type: NodeType = NodeType.CROSS_REF
+    target_label: str = ""
+    ref_kind: Optional[str] = None
+    ref_text: Optional[str] = None
+
+
+class ChapterContext(BaseModel):
+    """Context for chapter-aware numbering.
+
+    Used during document traversal to track current chapter state
+    for proper section numbering and reference formatting.
+
+    Attributes:
+        chapter_number: Current chapter number (1-based).
+        chapter_title: Title of the current chapter.
+        section_counter: Counter for sections within the current chapter.
+    """
+
+    chapter_number: int = 1
+    chapter_title: str = ""
+    section_counter: int = 0
+    figure_counter: int = 0
+    table_counter: int = 0
+    equation_counter: int = 0
+
+
+# Type alias for inline nodes (used in Paragraph.runs)
+InlineNode = (
+    TextRun
+    | InlineRunNode
+    | InlineCodeNode
+    | InlineMathNode
+    | Bookmark
+    | CrossRefNode
+    | CrossReference
+)
+
+
+# Type alias for all IR nodes
+IRNode = (
+    Document
+    | Section
+    | Paragraph
+    | ListBlock
+    | ListItem
+    | TableNode
+    | Figure
+    | Equation
+    | MathNode
+    | TextRun
+    | InlineRunNode
+    | InlineCodeNode
+    | InlineMathNode
+    | Bookmark
+    | CrossReference
+    | CrossRefNode
+    | Caption
+)
+
+
+class CrossRefMap(BaseModel):
+    """Map for cross-reference resolution."""
+
+    labels: dict[str, BaseNode] = Field(default_factory=dict)
 
     def register(self, label: str, node: BaseNode) -> None:
+        """Register a label with its node."""
         self.labels[label] = node
 
     def resolve(self, label: str) -> Optional[BaseNode]:
+        """Resolve a label to its node."""
         return self.labels.get(label)

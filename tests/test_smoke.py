@@ -3,8 +3,7 @@
 from pathlib import Path
 import tempfile
 from typst_gost_docx.ingest.project_loader import TypstProjectLoader
-from typst_gost_docx.parser.scanner import TypstScanner
-from typst_gost_docx.parser.extractor import TypstExtractor
+from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 from typst_gost_docx.writers.docx_writer import DocxWriter
 
 
@@ -14,8 +13,7 @@ def test_minimal_document_load():
 This is a paragraph.
 """
     loader = TypstProjectLoader(Path("test.typ"))
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -28,8 +26,7 @@ def test_headings_extraction():
 == Heading 2
 === Heading 3
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -45,8 +42,7 @@ def test_paragraphs_extraction():
 
 Second paragraph.
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -59,8 +55,7 @@ def test_list_extraction():
 - Second item
 - Third item
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -74,8 +69,7 @@ def test_numbered_list_extraction():
     text = """1. First item
 2. Second item
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -85,6 +79,8 @@ def test_numbered_list_extraction():
 
 
 def test_scanner_basic_tokens():
+    from typst_gost_docx.parser.scanner import TypstScanner
+
     text = """= Heading
 
 - Bullet
@@ -115,8 +111,7 @@ def test_e2e_conversion():
   caption: [Тестовый рисунок],
 ) <fig-test>
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
     doc = extractor.extract()
 
     assert doc.node_type == "document"

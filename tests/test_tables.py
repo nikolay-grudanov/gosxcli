@@ -1,7 +1,6 @@
 """Tests for table handling."""
 
-from typst_gost_docx.parser.scanner import TypstScanner
-from typst_gost_docx.parser.extractor import TypstExtractor
+from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 
 
 def test_basic_table():
@@ -12,15 +11,14 @@ def test_basic_table():
   [Cell 3][Cell 4],
 )
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
     tables = [b for b in doc.blocks if b.node_type == "table"]
     assert len(tables) == 1
     assert len(tables[0].rows) == 2
-    assert len(tables[0].rows[0].cells) == 2
+    assert len(tables[0].rows[0]) == 2
 
 
 def test_table_with_header():
@@ -32,8 +30,7 @@ def test_table_with_header():
   [Cell 3][Cell 4],
 )
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -49,14 +46,13 @@ def test_table_single_row():
   [A][B][C],
 )
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
     tables = [b for b in doc.blocks if b.node_type == "table"]
     assert len(tables) == 1
-    assert len(tables[0].rows[0].cells) == 3
+    assert len(tables[0].rows[0]) == 3
 
 
 def test_empty_table():
@@ -65,8 +61,7 @@ def test_empty_table():
   columns: 1,
 )
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 

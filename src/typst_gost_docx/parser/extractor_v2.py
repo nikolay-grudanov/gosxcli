@@ -1,8 +1,7 @@
 """State-machine based Typst extractor."""
 
 import uuid
-from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Any
 from enum import Enum, auto
 
 from ..ir.model import (
@@ -10,13 +9,16 @@ from ..ir.model import (
     Section,
     Paragraph,
     TextRun,
+    InlineRunNode,
+    InlineCodeNode,
+    InlineNode,
     ListBlock,
     ListItem,
     Figure,
     Caption,
-    Table,
-    TableRow,
-    TableCell,
+    TableNode,
+    TableHeaderNode,
+    TableCellNode,
     Equation,
     CrossReference,
     NodeType,
@@ -24,7 +26,7 @@ from ..ir.model import (
     ListKind,
     SourceLocation,
 )
-from .scanner import TypstScanner, Token
+from .scanner import TypstScanner
 
 
 class ParserState(Enum):
@@ -118,7 +120,7 @@ class TypstExtractorV2:
         section = Section(
             id=str(uuid.uuid4()),
             level=level,
-            source_location=SourceLocation(self.file_path, token.line, token.column),
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
             numbering_kind=NumberingKind.SECTION,
         )
 
@@ -139,15 +141,15 @@ class TypstExtractorV2:
             IR Paragraph or None
         """
         token = self.tokens[self.pos]
-        content_nodes = self._extract_paragraph_content()
+        runs = self._extract_paragraph_content()
 
-        if not content_nodes:
+        if not runs:
             return None
 
         paragraph = Paragraph(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(self.file_path, token.line, token.column),
-            content=content_nodes,
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
+            runs=runs,
         )
 
         if self.current_label:
@@ -156,13 +158,13 @@ class TypstExtractorV2:
 
         return paragraph
 
-    def _extract_paragraph_content(self) -> List[Any]:
-        """Extract paragraph content nodes.
+    def _extract_paragraph_content(self) -> list[InlineNode]:
+        """Extract paragraph content nodes with inline formatting.
 
         Returns:
-            List of IR nodes (TextRun, CrossReference, etc.)
+            List of IR nodes (TextRun, InlineRunNode, InlineCodeNode, etc.)
         """
-        nodes = []
+        nodes: list[InlineNode] = []
         current_text = ""
 
         while self.pos < len(self.tokens):
@@ -173,11 +175,7 @@ class TypstExtractorV2:
                 break
             elif token.type == "REF":
                 if current_text.strip():
-                    nodes.append(
-                        TextRun(
-                            node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=current_text
-                        )
-                    )
+                    nodes.extend(self._parse_inline_formatting(current_text))
                     current_text = ""
 
                 ref = self._extract_ref()
@@ -190,9 +188,7 @@ class TypstExtractorV2:
                 self.pos += 1
 
         if current_text.strip():
-            nodes.append(
-                TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=current_text)
-            )
+            nodes.extend(self._parse_inline_formatting(current_text))
 
         return nodes
 
@@ -208,7 +204,7 @@ class TypstExtractorV2:
         list_block = ListBlock(
             id=str(uuid.uuid4()),
             kind=kind,
-            source_location=SourceLocation(self.file_path, token.line, token.column),
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
         )
 
         while self.pos < len(self.tokens):
@@ -216,6 +212,11 @@ class TypstExtractorV2:
             if current_token.type == "BULLET" or current_token.type == "NUMBERED":
                 self.pos += 1
                 text = self._get_text_until_newline()
+
+                # Skip NEWLINE tokens to reach next list item or end of list
+                while self.pos < len(self.tokens) and self.tokens[self.pos].type == "NEWLINE":
+                    self.pos += 1
+
                 item = ListItem(
                     id=str(uuid.uuid4()),
                     content=[TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=text)],
@@ -237,9 +238,12 @@ class TypstExtractorV2:
 
         content = self._extract_until_matching_paren()
 
+        # Skip the closing paren token (paren_level went to 0)
+        self.pos += 1
+
         figure = Figure(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(self.file_path, token.line, token.column),
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
         )
 
         image_path = self._extract_image_path(content)
@@ -261,20 +265,23 @@ class TypstExtractorV2:
 
         return figure
 
-    def _extract_table(self) -> Optional[Table]:
+    def _extract_table(self) -> Optional[TableNode]:
         """Extract table from tokens.
 
         Returns:
-            IR Table or None
+            IR TableNode or None
         """
         token = self.tokens[self.pos]
         self.pos += 1
 
         content = self._extract_until_matching_paren()
 
-        table = Table(
+        # Skip the closing paren token (paren_level went to 0)
+        self.pos += 1
+
+        table = TableNode(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(self.file_path, token.line, token.column),
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
         )
 
         lines = content.split("\n")
@@ -285,16 +292,17 @@ class TypstExtractorV2:
                 continue
 
             if "table.header(" in line:
-                cells = self._extract_header_cells(line)
-                if cells:
-                    row = TableRow(id=str(uuid.uuid4()), cells=cells)
-                    table.rows.append(row)
+                header_cells = self._extract_header_cells(line)
+                if header_cells:
+                    table.header = TableHeaderNode(
+                        id=str(uuid.uuid4()),
+                        cells=header_cells,
+                    )
                     table.has_header = True
             elif line.startswith("["):
-                cells = self._extract_row_cells(line)
-                if cells:
-                    row = TableRow(id=str(uuid.uuid4()), cells=cells)
-                    table.rows.append(row)
+                row_cells = self._extract_row_cells(line)
+                if row_cells:
+                    table.rows.append(row_cells)
 
         if self.current_label:
             table.label = self.current_label
@@ -315,7 +323,7 @@ class TypstExtractorV2:
 
         equation = Equation(
             id=str(uuid.uuid4()),
-            source_location=SourceLocation(self.file_path, token.line, token.column),
+            source_location=SourceLocation(file_path=self.file_path, line=token.line, column=token.column),
             latex=latex,
             numbering_kind=NumberingKind.EQUATION,
         )
@@ -361,16 +369,16 @@ class TypstExtractorV2:
         self.pos += 1
         return None
 
-    def _extract_header_cells(self, line: str) -> List[TableCell]:
+    def _extract_header_cells(self, line: str) -> list[TableCellNode]:
         """Extract header cells from table header line.
 
         Args:
             line: Table header line
 
         Returns:
-            List of IR TableCells
+            List of IR TableCellNode
         """
-        cells: List[TableCell] = []
+        cells: list[TableCellNode] = []
         content = line[line.find("table.header(") + len("table.header(") :]
         content = content.rstrip(")").strip()
 
@@ -380,10 +388,10 @@ class TypstExtractorV2:
                 break
 
             cell_text = content[1:end_bracket].strip()
-            cell_content: List[Any] = [
+            cell_content: list[InlineNode] = [
                 TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
             ]
-            cell = TableCell(
+            cell = TableCellNode(
                 id=str(uuid.uuid4()),
                 content=cell_content,
             )
@@ -393,16 +401,16 @@ class TypstExtractorV2:
 
         return cells
 
-    def _extract_row_cells(self, line: str) -> List[TableCell]:
+    def _extract_row_cells(self, line: str) -> list[TableCellNode]:
         """Extract cells from table row line.
 
         Args:
             line: Table row line
 
         Returns:
-            List of IR TableCells
+            List of IR TableCellNode
         """
-        cells: List[TableCell] = []
+        cells: list[TableCellNode] = []
         content = line.strip()
 
         while content.startswith("["):
@@ -411,10 +419,10 @@ class TypstExtractorV2:
                 break
 
             cell_text = content[1:end_bracket].strip()
-            cell_content: List[Any] = [
+            cell_content: list[InlineNode] = [
                 TextRun(node_type=NodeType.TEXT_RUN, id=str(uuid.uuid4()), text=cell_text)
             ]
-            cell = TableCell(
+            cell = TableCellNode(
                 id=str(uuid.uuid4()),
                 content=cell_content,
             )
@@ -468,6 +476,95 @@ class TypstExtractorV2:
 
         return nodes
 
+    def _parse_inline_formatting(self, text: str) -> list[InlineNode]:
+        """Parse inline formatting from text.
+
+        Supports:
+        - *text* → bold
+        - _text_ → italic
+        - `code` → inline code
+
+        Args:
+            text: Text content to parse
+
+        Returns:
+            List of IR nodes with proper formatting
+        """
+        import re
+
+        nodes: list[InlineNode] = []
+
+        # Pattern for bold (*text*), italic (_text_), and code (`code`)
+        pattern = r"(\*([^*]+)\*)|(_([^_]+)_)|(`([^`]+)`)"
+
+        last_end = 0
+        for match in re.finditer(pattern, text):
+            # Add plain text before the match
+            if match.start() > last_end:
+                plain_text = text[last_end : match.start()]
+                if plain_text:
+                    nodes.append(
+                        TextRun(
+                            node_type=NodeType.TEXT_RUN,
+                            id=str(uuid.uuid4()),
+                            text=plain_text,
+                        )
+                    )
+
+            # Determine the formatting type based on which group matched
+            if match.group(1):  # bold: *text*
+                nodes.append(
+                    InlineRunNode(
+                        node_type=NodeType.INLINE_RUN,
+                        id=str(uuid.uuid4()),
+                        text=match.group(2),
+                        bold=True,
+                    )
+                )
+            elif match.group(3):  # italic: _text_
+                nodes.append(
+                    InlineRunNode(
+                        node_type=NodeType.INLINE_RUN,
+                        id=str(uuid.uuid4()),
+                        text=match.group(4),
+                        italic=True,
+                    )
+                )
+            elif match.group(5):  # code: `code`
+                nodes.append(
+                    InlineCodeNode(
+                        node_type=NodeType.INLINE_CODE,
+                        id=str(uuid.uuid4()),
+                        code=match.group(6),
+                    )
+                )
+
+            last_end = match.end()
+
+        # Add remaining plain text after last match
+        if last_end < len(text):
+            remaining = text[last_end:]
+            if remaining:
+                nodes.append(
+                    TextRun(
+                        node_type=NodeType.TEXT_RUN,
+                        id=str(uuid.uuid4()),
+                        text=remaining,
+                    )
+                )
+
+        # If no matches, return the whole text as plain text
+        if not nodes and text:
+            nodes.append(
+                TextRun(
+                    node_type=NodeType.TEXT_RUN,
+                    id=str(uuid.uuid4()),
+                    text=text,
+                )
+            )
+
+        return nodes
+
     def _get_text_until_newline(self) -> str:
         """Get text until next newline token.
 
@@ -503,20 +600,28 @@ class TypstExtractorV2:
         """Extract content until matching closing parenthesis.
 
         Returns:
-            Content string
+            Content string (excluding the final closing parenthesis).
         """
         content = ""
         paren_level = 1
 
         while self.pos < len(self.tokens) and paren_level > 0:
             token = self.tokens[self.pos]
-            if token.value == "(":
-                paren_level += 1
-            elif token.value == ")":
-                paren_level -= 1
+
+            # Count parens in token value (not exact match)
+            open_count = token.value.count("(")
+            close_count = token.value.count(")")
+            paren_level += open_count
+            paren_level -= close_count
 
             if paren_level > 0:
                 content += token.value
+            else:
+                # Don't include the closing paren(s) - find first ')' and truncate there
+                first_close = token.value.find(")")
+                if first_close >= 0:
+                    content += token.value[:first_close]
+                break
 
             self.pos += 1
 

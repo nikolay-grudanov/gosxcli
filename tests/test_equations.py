@@ -1,15 +1,13 @@
 """Tests for equation handling."""
 
-from typst_gost_docx.parser.scanner import TypstScanner
-from typst_gost_docx.parser.extractor import TypstExtractor
+from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 
 
 def test_inline_math():
     text = """
 The equation is $E = mc^2$.
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -23,8 +21,7 @@ $$
 x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}
 $$
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -42,8 +39,7 @@ $$
 F = ma
 $$
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -52,18 +48,16 @@ $$
 
 
 def test_math_with_greek():
-    text = """
-$$
-\alpha + \beta = \gamma
-$$
-"""
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    # Use raw string for input to preserve backslashes
+    # Then manually handle newlines since raw strings don't interpret \n
+    text = "$$" + "\n" + r"\alpha + \beta = \gamma" + "\n" + "$$"
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
     equations = [b for b in doc.blocks if b.node_type == "equation"]
     assert len(equations) == 1
+    # The result will contain single backslash (preserved from raw string)
     assert r"\alpha" in equations[0].latex
     assert r"\beta" in equations[0].latex
 
@@ -74,8 +68,7 @@ $$
 \sum_{i=1}^{n} x_i
 $$
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 

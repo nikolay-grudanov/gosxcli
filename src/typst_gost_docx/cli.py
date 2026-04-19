@@ -7,11 +7,10 @@ import json
 from rich.console import Console
 from rich.table import Table as RichTable
 
-from .config import Config, MathMode
+from .config import Config, MathMode, RefLabels
 from .logging import setup_logging
 from .ingest.project_loader import TypstProjectLoader
-from .parser.scanner import TypstScanner
-from .parser.extractor import TypstExtractor
+from .parser.extractor_v2 import TypstExtractorV2
 from .writers.docx_writer import DocxWriter
 
 app = typer.Typer(help="Typst to DOCX converter for academic documents")
@@ -37,7 +36,7 @@ def convert(
 ):
     """Convert a Typst document to DOCX with GOST styling."""
 
-    logger = setup_logging(log_level)
+    setup_logging(log_level)
 
     if not input_file.exists():
         console.print(f"[red]Error: Input file not found: {input_file}[/red]")
@@ -54,9 +53,10 @@ def convert(
         debug=debug,
         dump_ir=dump_ir,
         dump_json=dump_json,
-        strict=strict,
+        strict_mode=strict,
         math_mode=math_mode,
         log_level=log_level,
+        ref_labels=RefLabels(),
     )
 
     try:
@@ -76,8 +76,8 @@ def _run_conversion(config: Config) -> dict:
     loader = TypstProjectLoader(config.input_file)
     files = loader.load()
 
-    scanner = TypstScanner(files[str(config.input_file)])
-    extractor = TypstExtractor(scanner, str(config.input_file))
+    text = files[str(config.input_file)]
+    extractor = TypstExtractorV2(text, str(config.input_file))
     ir_document = extractor.extract()
 
     if config.dump_ir or config.dump_json:

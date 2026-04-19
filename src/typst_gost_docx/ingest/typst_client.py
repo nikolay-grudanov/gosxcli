@@ -17,9 +17,9 @@ class TypstClient:
     def _check_typst_available(self) -> bool:
         """Check if typst-py is available."""
         try:
-            import typst
+            import importlib.util
 
-            return True
+            return importlib.util.find_spec("typst") is not None
         except ImportError:
             logger.warning("typst-py not available, falling back to scanner-based parser")
             return False

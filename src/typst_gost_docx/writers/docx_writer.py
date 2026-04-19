@@ -10,12 +10,15 @@ from ..ir.model import (
     Section,
     Paragraph,
     ListBlock,
-    Table,
+    TableNode,
     Figure,
     Caption,
     Equation,
     CrossReference,
+    CrossRefNode,
     TextRun,
+    InlineRunNode,
+    InlineCodeNode,
     NumberingKind,
     ListKind,
 )
@@ -71,7 +74,7 @@ class DocxWriter:
             self._write_list(block)
         elif isinstance(block, Figure):
             self._write_figure(block)
-        elif isinstance(block, Table):
+        elif isinstance(block, TableNode):
             self._write_table(block)
         elif isinstance(block, Equation):
             self._write_equation(block)
@@ -92,15 +95,32 @@ class DocxWriter:
         self.stats["paragraphs"] += 1
 
         para = self.doc.add_paragraph(style="Normal")
-        self._write_inline_nodes(para, paragraph.content)
+        self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
     def _write_inline_nodes(self, para, nodes: list[BaseNode]) -> None:
         for node in nodes:
             if isinstance(node, TextRun):
                 para.add_run(node.text)
+            elif isinstance(node, InlineRunNode):
+                run = para.add_run(node.text)
+                if node.bold:
+                    run.bold = True
+                if node.italic:
+                    run.italic = True
+                if node.underline:
+                    run.underline = True
+            elif isinstance(node, InlineCodeNode):
+                run = para.add_run(node.code)
+                try:
+                    run.style = "Code"
+                except KeyError:
+                    # Fallback: use Courier font if Code style doesn't exist
+                    run.font.name = "Courier New"
             elif isinstance(node, CrossReference):
                 self._write_cross_reference(node, para)
+            elif isinstance(node, CrossRefNode):
+                run = para.add_run(node.ref_text if node.ref_text else node.target_label)
             elif hasattr(node, "content"):
                 self._write_inline_nodes(para, node.content)
 
@@ -109,7 +129,7 @@ class DocxWriter:
 
         for item in list_block.items:
             text = self._nodes_to_text(item.content)
-            para = self.doc.add_paragraph(text, style=style)
+            self.doc.add_paragraph(text, style=style)
 
     def _write_figure(self, figure: Figure) -> None:
         self.stats["figures"] += 1
@@ -123,7 +143,7 @@ class DocxWriter:
         if figure.caption:
             self._write_caption(figure.caption)
 
-    def _write_table(self, table: Table) -> None:
+    def _write_table(self, table: TableNode) -> None:
         self.stats["tables"] += 1
         self.tables_manager.add_table(self.doc, table)
 
@@ -194,7 +214,7 @@ class DocxWriter:
             prefix = "Формула "
 
         para = self.doc.add_paragraph(style="Caption")
-        run = para.add_run(f"{prefix}{caption.text}")
+        para.add_run(f"{prefix}{caption.text}")
 
     def _nodes_to_text(self, nodes: list[BaseNode]) -> str:
         text_parts = []
