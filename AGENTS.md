@@ -334,3 +334,10 @@ Subagents вызываются через @-упоминание или Task too
 ## License
 
 MIT License - see LICENSE file.
+
+## Active Technologies
+- Python 3.12+ + None (custom BibTeX parser), existing: typer, pydantic v2, python-docx (002-bugfix-v0.1-labels-refs-math)
+- N/A (file-based input) (002-bugfix-v0.1-labels-refs-math)
+
+## Recent Changes
+- 002-bugfix-v0.1-labels-refs-math: Added Python 3.12+ + None (custom BibTeX parser), existing: typer, pydantic v2, python-docx
