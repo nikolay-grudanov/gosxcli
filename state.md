@@ -1,6 +1,6 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-04-19 (Phase 7: Polish & Cross-Cutting Concerns - ALL TASKS COMPLETE)
+**Last Updated:** 2026-04-20 (Phase 7: Polish & Cross-Cutting Concerns - Bibliography support completed)
 **Version:** v0.2.0 (Feature Complete)
 **Status:** Release Ready - All tests passing (135/135)
 
@@ -38,6 +38,7 @@
 | Bidirectional validation | ✅ Complete | T058-T062: ReferenceValidator, ValidationResult, CLI integration |
 | Table of Contents | ✅ Complete | T056-T057: #outline() parsing and DOCX TOC generation |
 | Multi-file support | ✅ Complete | T024-T027: #include recursive loading with depth protection |
+| Bibliography support | ✅ Complete | T038-T046: BibTeX parser, @[key] citations, numeric/author-year styles |
 | CLI flags | ✅ Complete | T063-T065: --math-mode, --strict, --debug, --benchmark |
 | Nested tables | ✅ Complete | T048-T049: Table detection in figures, nested table generation in cells |
 | Enhanced label parsing | ✅ Complete | Updated scanner patterns to support labels with colons and hyphens |
@@ -58,7 +59,6 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Code blocks | 🔲 Not Started | Syntax highlighting |
-| Bibliography | 🔲 Not Started | Reference management |
 | Page breaks | 🔲 Not Started | Section formatting |
 | Error handling | 🔲 Not Started | Robust error messages |
 | Full GOST | 🔲 Not Started | Complete compliance |
@@ -224,7 +224,49 @@
    - Added `make regression` and `make update-golden` targets to Makefile
 - **All 130 tests passing (117 existing + 3 regression), mypy --strict passing for new code, ruff passing**
 
-### Phase 7: Polish & Cross-Cutting Concerns (Completed: 2026-04-19) ✅
+### Phase 7: Polish & Cross-Cutting Concerns (Completed: 2026-04-20) ✅
+- [x] T038: Updated README.md with bibliography documentation ✅
+  - Added "Bibliography" section with BibTeX file support
+  - Documented @[key] citations syntax
+  - Documented --bibliography and --bibliography-style CLI flags
+  - Documented bibliography formats per ГОСТ 7.32-2017
+- [x] T039: Updated state.md with completed bibliography feature ✅
+  - Added Bibliography Support to v0.2 Progress Tracker
+  - Updated Last Updated date to 2026-04-20
+- [x] T040: Add warning for missing keys in validator.py ✅
+  - Added CitationNode import to ReferenceValidator
+  - Added bibliography_entries parameter to __init__
+  - Added referenced_citations set to track citation keys
+  - Added citation key collection in _collect_from_nodes
+  - Added missing citation key validation in validate() with warnings
+- [x] T041: Handle incomplete entries with placeholder text ✅
+  - Updated _format_bibliography_entry to use "[Без автора]" for missing author
+  - Updated _format_bibliography_entry to use "[Без названия]" for missing title
+  - Updated _format_bibliography_entry_author_year with same placeholders
+  - Applied to all entry types (ARTICLE, BOOK, INPROCEEDINGS, MISC)
+- [x] T042: Add inline comments to BibTeX parser in bibliography.py ✅
+  - Added detailed comments to _parse_entry_type() with type descriptions
+  - Added detailed comments to _strip_latex_commands() with regex explanations
+  - Added detailed comments to _parse_bibtex_value() with unescape logic
+  - Added detailed comments to BibTeXParser.parse() with step-by-step flow
+- [x] T043: Add inline comments to bibliography formatting in docx_writer.py ✅
+  - Added detailed comments to _write_bibliography() with style explanations
+  - Added detailed comments to _format_bibliography_entry() with GOST formats
+  - Added detailed comments to _format_bibliography_entry_author_year() with formats
+  - Added detailed comments to _get_bibliography_sort_key() with sorting logic
+- [x] T044: Run full test suite ✅
+  - All 175 tests passing
+  - No test failures
+  - Test suite completed in 1.60s
+- [x] T045: Run ruff check and mypy --strict ✅
+  - ruff check: All checks passed
+  - mypy --strict: Success for validator.py and bibliography.py
+  - Fixed 1 ruff error (unused import in extractor_v2.py)
+- [x] T046: Update CHANGELOG.md with bibliography feature ✅
+  - Updated version date to 2026-04-20
+  - Added "Bibliography Support" section to new features
+  - Added --bibliography and --bibliography-style CLI flags
+  - Updated "Improvements" section with bibliography-related changes
 - [x] T098-T103: Performance Benchmarking Implementation
    - Added pytest-benchmark>=4.0.0 to pyproject.toml dev dependencies
    - Created `benchmarks/test_benchmarks.py` with 3 performance benchmarks:
@@ -358,6 +400,7 @@
 | 2026-04-19 | Implemented regression testing framework Phase 6 (T089-T097) | Created golden DOCX files, DocxComparator class, structure checks, diff reporting, --update-golden option, make regression targets |
 | 2026-04-19 | Implemented performance benchmarking and E2E structure testing Phase 7 (T098-T108) | Added pytest-benchmark integration, performance thresholds, CLI --benchmark flag, E2E structure tests for DOCX validation, make benchmark and make e2e targets |
 | 2026-04-19 | Completed Phase 7: Polish & Cross-Cutting Concerns (T109-T124) | Updated README.md with v0.2.0 features, updated pyproject.toml to v0.2.0, added inline comments, verified optimization, validated error handling, created v0.1 smoke tests, confirmed DOCX compatibility |
+| 2026-04-20 | Completed Phase 7: Bibliography Polish (T038-T046) | Added bibliography documentation to README.md, updated state.md, added citation key validation with warnings, added placeholder text for incomplete entries, added inline comments to bibliography.py and docx_writer.py, all tests passing (175), ruff and mypy --strict passing, updated CHANGELOG.md |
 
 ---
 

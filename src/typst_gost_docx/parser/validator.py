@@ -11,6 +11,8 @@ from ..ir.model import (
     Section,
     Paragraph,
     ValidationResult,
+    CitationNode,
+    BibliographyEntry,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,16 +24,26 @@ class ReferenceValidator:
     Проверяет что:
     - Все ссылки (@label) имеют определения
     - Все метки (<label>) используются в ссылках
+    - Все цитирования (@[key]) имеют соответствующие записи в библиографии
 
     Attributes:
         defined_labels: Словарь определённых меток {label: node}.
         referenced_labels: Множество ссылок на метки.
+        bibliography_entries: Словарь библиографических записей {key: entry}.
+        referenced_citations: Множество citation keys, использованных в документе.
     """
 
-    def __init__(self) -> None:
-        """Инициализирует валидатор."""
+    def __init__(self, bibliography_entries: dict[str, BibliographyEntry] | None = None) -> None:
+        """Инициализирует валидатор.
+
+        Args:
+            bibliography_entries: Опциональный словарь библиографических записей
+                для проверки citation keys.
+        """
         self.defined_labels: dict[str, BaseNode] = {}
         self.referenced_labels: set[str] = set()
+        self.bibliography_entries: dict[str, BibliographyEntry] = bibliography_entries or {}
+        self.referenced_citations: set[str] = set()
 
     def collect_from_document(self, doc: Document) -> None:
         """Собирает все метки и ссылки из IR документа.
@@ -39,12 +51,14 @@ class ReferenceValidator:
         Рекурсивно обходит дерево документа и собирает:
         - Метки из узлов с атрибутом label
         - Ссылки из узлов CrossReference и CrossRefNode
+        - Citation keys из узлов CitationNode
 
         Args:
             doc: IR документ для анализа.
         """
         self.defined_labels.clear()
         self.referenced_labels.clear()
+        self.referenced_citations.clear()
 
         self._collect_from_nodes(doc.blocks)
 
@@ -63,6 +77,10 @@ class ReferenceValidator:
             if isinstance(node, (CrossReference, CrossRefNode)):
                 self.referenced_labels.add(node.target_label)
 
+            # Собираем citation keys
+            if isinstance(node, CitationNode):
+                self.referenced_citations.add(node.key)
+
             # Рекурсивно обходим вложенные узлы
             if isinstance(node, Document):
                 self._collect_from_nodes(node.blocks)
@@ -73,6 +91,8 @@ class ReferenceValidator:
                     for run in node.runs:
                         if isinstance(run, (CrossReference, CrossRefNode)):
                             self.referenced_labels.add(run.target_label)
+                        elif isinstance(run, CitationNode):
+                            self.referenced_citations.add(run.key)
 
     def validate(self) -> ValidationResult:
         """Выполняет bidirectional валидацию ссылок и меток.
@@ -80,6 +100,7 @@ class ReferenceValidator:
         Находит:
         - Неопределённые ссылки: ссылки, которые не имеют определения
         - Неиспользуемые метки: метки, на которые нет ссылок
+        - Отсутствующие citation keys: @[key] citations, которые не найдены в .bib файле
 
         Returns:
             ValidationResult с результатами валидации.
@@ -91,6 +112,16 @@ class ReferenceValidator:
             undefined_refs=undefined_refs,
             unreferenced_labels=unreferenced_labels,
         )
+
+        # Проверяем отсутствующие citation keys (если bibliography_entries задан)
+        if self.bibliography_entries:
+            missing_citations = self.referenced_citations - self.bibliography_entries.keys()
+            if missing_citations:
+                # Добавляем missing citations в undefined_refs
+                result.undefined_refs.update(missing_citations)
+                # Логируем warning для каждого missing citation
+                for key in sorted(missing_citations):
+                    logger.warning(f"Citation key '@[{key}]' not found in bibliography file")
 
         # Логируем результаты
         if result.has_errors:

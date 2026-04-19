@@ -147,6 +147,57 @@ Content...
 - Relative path resolution
 - Cycle detection
 - Debug logging for include tracking
+
+### Bibliography
+```typst
+// BibTeX file (references.bib)
+@article{smith2023,
+  author = {Smith, J. and Johnson, A.},
+  title = {A Novel Approach to AI},
+  journal = {Journal of Artificial Intelligence},
+  year = {2023},
+  pages = {12-25}
+}
+
+@book{brown2022,
+  author = {Brown, R.},
+  title = {Advanced Deep Learning},
+  publisher = {Academic Press},
+  year = {2022},
+  address = {New York}
+}
+
+// In your Typst document
+Recent studies have shown @smith2023. This approach builds on the work of @brown2022.
+```
+
+**Features:**
+- BibTeX file support (.bib files)
+- Inline citations with @[key] syntax
+- Two citation styles: numeric and author-year
+- Bibliography section formatting per ГОСТ 7.32-2017
+- Alphabetical sorting for author-year style
+- Placeholder text for incomplete entries
+
+**Citation styles:**
+- **Numeric**: [1], [2], [3] - Entries are numbered in order of first citation
+- **Author-year**: (Smith, 2023), (Brown, 2022) - Entries are sorted alphabetically by author
+
+**CLI usage:**
+```bash
+# Convert with bibliography (numeric style - default)
+typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib
+
+# Convert with author-year style
+typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib --bibliography-style author-year
+```
+
+**Bibliography formats (ГОСТ 7.32-2017):**
+- Article: Автор А.А. Название // Журнал. — Год. — С. XX-XX.
+- Book: Автор Б.Б. Название. — Город: Издательство, Год. — 256 с.
+- Inproceedings: Автор В.В. Название // Труды конференции. — Год. — С. XX-XX.
+- Author-year style: Автор А.А. (Год) Название // Журнал. — С. XX-XX.
+
 ## Architecture
 
 The converter uses a 4-layer pipeline:

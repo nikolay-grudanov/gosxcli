@@ -17,11 +17,15 @@ from ..ir.model import (
     CrossReference,
     CrossRefNode,
     TOCNode,
+    CitationNode,
+    BibliographySection,
+    BibliographyEntry,
     TextRun,
     InlineRunNode,
     InlineCodeNode,
     NumberingKind,
     ListKind,
+    CitationStyle,
     ChapterContext,
     ValidationResult,
 )
@@ -39,6 +43,7 @@ class DocxWriter:
         reference_doc: Optional[Path] = None,
         math_mode: MathMode = MathMode.FALLBACK,
         ref_labels: Optional[RefLabels] = None,
+        bibliography_style: CitationStyle = CitationStyle.NUMERIC,
     ):
         """Инициализирует DOCX writer.
 
@@ -46,9 +51,12 @@ class DocxWriter:
             reference_doc: Путь к шаблону DOCX для стилизации.
             math_mode: Режим рендеринга математических выражений.
             ref_labels: Локализованные метки для ссылок.
+            bibliography_style: Стиль цитирования (numeric или author-year).
         """
         self.reference_doc = reference_doc
         self.math_mode = math_mode
+        self.citation_style = bibliography_style
+        self.entry_lookup: dict[str, BibliographyEntry] = {}
         self.doc = None
         self.bookmarks_manager = BookmarksManager()
         self.styles_manager = StylesManager()
@@ -84,8 +92,6 @@ class DocxWriter:
             self._write_block(block)
 
     def _write_block(self, block: BaseNode) -> None:
-        from ..ir.model import Equation, CrossReference
-
         if isinstance(block, Section):
             self._write_section(block)
         elif isinstance(block, Paragraph):
@@ -100,6 +106,8 @@ class DocxWriter:
             self._write_equation(block)
         elif isinstance(block, TOCNode):
             self._write_toc(block)
+        elif isinstance(block, BibliographySection):
+            self._write_bibliography(block)
         elif isinstance(block, CrossReference):
             pass
 
@@ -159,6 +167,8 @@ class DocxWriter:
                 self._write_cross_reference(node, para)
             elif isinstance(node, CrossRefNode):
                 self._write_cross_ref_node(node, para)
+            elif isinstance(node, CitationNode):
+                self._write_citation(node, para)
             elif hasattr(node, "content"):
                 self._write_inline_nodes(para, node.content)
 
@@ -315,6 +325,299 @@ class DocxWriter:
         placeholder.runs[0].italic = True
         placeholder.runs[0].font.color.rgb = None  # Use default color
 
+    def _write_bibliography(self, bib_section: BibliographySection) -> None:
+        """Записывает библиографическую секцию в документ.
+
+        Генерирует секцию "Список литературы" с форматированием по ГОСТ 7.32-2017.
+
+        Стили цитирования:
+        - AUTHOR_YEAR: Записи сортируются по алфавиту (author → year), формат (Author, Year)
+        - NUMERIC: Записи в порядке цитирования, формат [1], [2], [3]
+
+        Форматирование по ГОСТ 7.32-2017:
+        - Hanging indent: 1.25 см (первая строка с отступом влево, остальные вправо)
+        - Заголовок: "Список литературы" (стиль Heading 1)
+
+        Args:
+            bib_section: IR узел библиографической секции.
+        """
+        from docx.shared import Cm
+        from ..ir.model import CitationStyle
+
+        # Add bibliography heading
+        # Uses Heading 1 style for consistent document structure
+        self.doc.add_paragraph(bib_section.heading, style="Heading 1")
+
+        # Get entries to write (sorted if AUTHOR_YEAR style)
+        entries = bib_section.entries
+        if bib_section.style == CitationStyle.AUTHOR_YEAR:
+            # Sort alphabetically by author last name, then by year
+            # Sorting is handled by _get_bibliography_sort_key
+            entries = sorted(entries, key=self._get_bibliography_sort_key)
+
+        # Write each bibliography entry with hanging indent
+        for i, entry in enumerate(entries, start=1):
+            # Format entry text based on citation style
+            entry_text = self._format_bibliography_entry(
+                entry, i, bib_section.style
+            )
+            para = self.doc.add_paragraph(style="Normal")
+
+            # Apply hanging indent (1.25cm as per ГОСТ 7.32-2017)
+            # First line indent is negative (hanging), rest is positive
+            # This creates the classic bibliography formatting where
+            # the first line is left-aligned and subsequent lines are indented
+            para.paragraph_format.first_line_indent = Cm(-1.25)
+            para.paragraph_format.left_indent = Cm(1.25)
+
+            # Add formatted entry text to paragraph
+            para.add_run(entry_text)
+
+    def _get_bibliography_sort_key(self, entry: BibliographyEntry) -> tuple[str, str]:
+        """Получает ключ сортировки для библиографической записи.
+
+        Используется для сортировки записей в AUTHOR_YEAR стиле.
+        Ключ сортировки: (фамилия_автора, год)
+
+        Логика сортировки:
+        - Извлекает фамилию автора (первое слово перед запятой или пробелом)
+        - Преобразует в lowercase для case-insensitive сортировки
+        - Записи без автора помещаются в конец (last_name = "zzz")
+        - Записи без года сортируются первыми (year = "0000")
+
+        Args:
+            entry: Библиографическая запись для сортировки.
+
+        Returns:
+            Кортеж из (фамилия_автора, год) для сортировки.
+        """
+        # Extract last name for sorting
+        author = entry.author or ""
+        # Author format may be "Иванов А.А." or "Ivanov A.A., Petrov B.B."
+        # Take first word (last name) and convert to lowercase
+        # This handles both single-author and multi-author entries
+        last_name = author.split()[0].lower() if author else "zzz"
+        # Use "zzz" for entries without author to place them at the end
+        year = entry.year or "0000"
+        # Use "0000" for entries without year to place them first among same author
+        return (last_name, year)
+
+    def _format_bibliography_entry(
+        self, entry: BibliographyEntry, number: int, style: CitationStyle = CitationStyle.NUMERIC
+    ) -> str:
+        """Форматирует библиографическую запись по ГОСТ 7.32-2017.
+
+        Форматы по ГОСТ 7.32-2017:
+
+        **Статья (ARTICLE):**
+        Автор А.А. Название // Журнал. — Год. — С. XX-XX.
+
+        **Книга (BOOK):**
+        Автор Б.Б. Название. — Город: Издательство, Год. — 256 с.
+
+        **Материалы конференции (INPROCEEDINGS):**
+        Автор В.В. Название // Труды конференции. — Год. — С. XX-XX.
+
+        **Разное (MISC, TECHREPORT, etc.):**
+        Автор. Название. — Год.
+
+        Особенности форматирования:
+        - Точки в конце полей удаляются (rstrip("."))
+        - Поля соединяются через ". " (точка + пробел)
+        - Для NUMERIC стиля добавляется номер: "1. Автор. Название..."
+        - Для AUTHOR_YEAR стиля используется отдельный метод
+
+        Args:
+            entry: BibliographyEntry для форматирования.
+            number: Порядковый номер записи (для NUMERIC стиля).
+            style: Стиль цитирования (numeric или author-year).
+
+        Returns:
+            Отформатированная строка записи.
+        """
+        from ..ir.model import BibliographyType
+
+        parts = []
+
+        if entry.entry_type == BibliographyType.ARTICLE:
+            # Article format: Автор А.А. Название // Журнал. — Год. — С. XX-XX.
+            # Use placeholder for missing fields
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            else:
+                parts.append("[Без автора]")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.journal:
+                parts.append(entry.journal.rstrip("."))
+            if entry.year:
+                parts.append(entry.year)
+            if entry.pages:
+                parts.append(f"С. {entry.pages}")
+
+        elif entry.entry_type == BibliographyType.BOOK:
+            # Book format: Автор Б.Б. Название. — Город: Издательство, Год. — 256 с.
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            else:
+                parts.append("[Без автора]")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            # Publisher may already include address (e.g., "Москва: Наука")
+            if entry.publisher:
+                pub = entry.publisher.rstrip(".")
+                if entry.address and entry.address not in pub:
+                    parts.append(f"{entry.address}: {pub}")
+                else:
+                    parts.append(pub)
+            if entry.year:
+                parts.append(entry.year)
+            if entry.pages:
+                parts.append(f"{entry.pages} с.")
+
+        elif entry.entry_type == BibliographyType.INPROCEEDINGS:
+            # Inproceedings format: Автор В.В. Название // Труды конференции. — Год. — С. XX-XX.
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            else:
+                parts.append("[Без автора]")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.booktitle:
+                parts.append(entry.booktitle.rstrip("."))
+            if entry.year:
+                parts.append(entry.year)
+            if entry.pages:
+                parts.append(f"С. {entry.pages}")
+
+        else:
+            # Generic format for other types (MISC, TECHREPORT, PHDTHESIS, etc.)
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            else:
+                parts.append("[Без автора]")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.year:
+                parts.append(entry.year)
+
+        # Join parts with '. ' (period space) as per GOST
+        entry_text = ". ".join(parts)
+
+        # Format based on citation style
+        if style == CitationStyle.AUTHOR_YEAR:
+            # AUTHOR_YEAR style: Use separate formatting method
+            return self._format_bibliography_entry_author_year(entry)
+        else:
+            # NUMERIC style: "1. Author Title..."
+            return f"{number}. {entry_text}"
+
+    def _format_bibliography_entry_author_year(self, entry: BibliographyEntry) -> str:
+        """Форматирует библиографическую запись в стиле author-year (ГОСТ Р 7.0.5-2008).
+
+        Форматы по ГОСТ Р 7.0.5-2008 (автор-год):
+
+        **Статья (ARTICLE):**
+        Автор А.А. (Год) Название // Журнал. — С. XX-XX.
+
+        **Книга (BOOK):**
+        Автор Б.Б. (Год) Название. — Город: Издательство. — 256 с.
+
+        **Материалы конференции (INPROCEEDINGS):**
+        Автор В.В. (Год) Название // Труды конференции. — С. XX-XX.
+
+        **Разное (MISC, TECHREPORT, etc.):**
+        Автор (Год) Название.
+
+        Особенности форматирования:
+        - Год в скобках после автора: (2023)
+        - Для статей и материалов конференции используется "//" перед названием журнала/конференции
+        - Поля соединяются через пробел
+        - Не добавляется номер записи (в отличие от NUMERIC стиля)
+        - Используется эм-даш (—) между частями
+
+        Args:
+            entry: BibliographyEntry для форматирования.
+
+        Returns:
+            Отформатированная строка записи без нумерации.
+        """
+        from ..ir.model import BibliographyType
+
+        parts = []
+        year = entry.year or ""
+
+        if entry.entry_type == BibliographyType.ARTICLE:
+            # Article format: Автор А.А. (Год) Название // Журнал. — С. XX-XX.
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            if year:
+                parts.append(f"({year})")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.journal:
+                parts.append(f"// {entry.journal.rstrip('.')}")
+            if entry.pages:
+                parts.append(f"— С. {entry.pages}")
+
+        elif entry.entry_type == BibliographyType.BOOK:
+            # Book format: Автор Б.Б. (Год) Название. — Город: Издательство. — 256 с.
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            if year:
+                parts.append(f"({year})")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.publisher:
+                pub = entry.publisher.rstrip(".")
+                if entry.address and entry.address not in pub:
+                    parts.append(f"— {entry.address}: {pub}")
+                else:
+                    parts.append(f"— {pub}")
+            if entry.pages:
+                parts.append(f"— {entry.pages} с.")
+
+        elif entry.entry_type == BibliographyType.INPROCEEDINGS:
+            # Inproceedings format: Автор В.В. (Год) Название // Труды конференции. — С. XX-XX.
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            if year:
+                parts.append(f"({year})")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+            if entry.booktitle:
+                parts.append(f"// {entry.booktitle.rstrip('.')}")
+            if entry.pages:
+                parts.append(f"— С. {entry.pages}")
+
+        else:
+            # Generic format for other types (MISC, TECHREPORT, PHDTHESIS, etc.)
+            if entry.author:
+                parts.append(entry.author.rstrip("."))
+            if year:
+                parts.append(f"({year})")
+            if entry.title:
+                parts.append(entry.title.rstrip("."))
+            else:
+                parts.append("[Без названия]")
+
+        # Join parts with single space (author-year style uses space separator)
+        return " ".join(parts)
+
     def _write_cross_reference(self, ref: CrossReference, para: Any) -> None:
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
@@ -394,6 +697,36 @@ class DocxWriter:
             run = para.add_run(ref_text)
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
+
+    def _write_citation(self, citation: CitationNode, para: Any) -> None:
+        """Записывает inline citation marker.
+
+        Supports both NUMERIC and AUTHOR_YEAR citation styles:
+        - NUMERIC: [1], [2], [3]
+        - AUTHOR_YEAR: (Иванов, 2023), (Петров, 2022)
+
+        Note: For NUMERIC style, brackets [] are captured as TEXT tokens
+        by the scanner, so we only output the number here.
+
+        Args:
+            citation: CitationNode с ключом и номером.
+            para: Paragraph для добавления маркера.
+        """
+        if self.citation_style == CitationStyle.AUTHOR_YEAR:
+            entry = self.entry_lookup.get(citation.key)
+            if entry and entry.author and entry.year:
+                # Extract last name (first word before comma or first word)
+                author_last = entry.author.split(',')[0].split()[0] if entry.author else ""
+                citation_text = f"({author_last}, {entry.year})"
+            else:
+                # Fallback to numeric if no author/year
+                citation_text = f"[{citation.number}]"
+        else:
+            # NUMERIC style: brackets are added by scanner
+            citation_text = f"{citation.number}"
+
+        run = para.add_run(citation_text)
+        run.italic = True
 
     def _format_cross_ref(self, ref: CrossRefNode) -> str:
         """Форматирует текст перекрёстной ссылки с chapter-aware нумерацией.

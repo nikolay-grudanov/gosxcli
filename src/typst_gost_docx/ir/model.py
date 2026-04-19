@@ -33,6 +33,8 @@ class NodeType(str, Enum):
     CROSS_REF = "cross_ref"
     TABLE_HEADER = "table_header"
     TOC = "toc"
+    CITATION = "citation"
+    BIBLIOGRAPHY_SECTION = "bibliography_section"
 
 
 class ListKind(str, Enum):
@@ -57,6 +59,25 @@ class MathRenderMode(str, Enum):
     NATIVE = "native"
     IMAGE = "image"
     FALLBACK = "fallback"
+
+
+class BibliographyType(str, Enum):
+    """Types of bibliographic entries (BibTeX entry types)."""
+
+    ARTICLE = "article"
+    BOOK = "book"
+    INPROCEEDINGS = "inproceedings"
+    TECHREPORT = "techreport"
+    MISC = "misc"
+    PHDTHESIS = "phdthesis"
+    MASTERSTHESIS = "mastersthesis"
+
+
+class CitationStyle(str, Enum):
+    """Citation style for inline references."""
+
+    NUMERIC = "numeric"
+    AUTHOR_YEAR = "author_year"
 
 
 class SourceLocation(BaseModel):
@@ -349,6 +370,78 @@ class TOCNode(BaseNode):
     title: str = "Содержание"
 
 
+class BibliographyEntry(BaseNode):
+    """Single bibliographic entry from BibTeX file.
+
+    Represents a single bibliographic reference with all its metadata.
+
+    Attributes:
+        key: Unique citation key (e.g., "smith2020").
+        entry_type: Type of bibliographic entry (article, book, etc.).
+        author: Author name(s).
+        title: Title of the work.
+        year: Publication year.
+        journal: Journal name (for articles).
+        booktitle: Book title (for inproceedings).
+        publisher: Publisher name.
+        address: City/location of publication.
+        pages: Page range (e.g., "12-25").
+        volume: Volume number.
+        number: Issue number.
+        doi: Digital Object Identifier.
+        url: Web URL.
+    """
+
+    key: str = ""
+    entry_type: BibliographyType = BibliographyType.MISC
+    author: str = ""
+    title: str = ""
+    year: str = ""
+    journal: str = ""
+    booktitle: str = ""
+    publisher: str = ""
+    address: str = ""
+    pages: str = ""
+    volume: str = ""
+    number: str = ""
+    doi: str = ""
+    url: str = ""
+
+
+class CitationNode(BaseNode):
+    """Inline citation marker in document.
+
+    Represents a @[key] citation in the document that references
+    a BibliographyEntry.
+
+    Attributes:
+        key: Reference to BibliographyEntry key.
+        number: Assigned citation number (1, 2, 3...).
+    """
+
+    node_type: NodeType = NodeType.CITATION
+    key: str = ""
+    number: int = 0
+
+
+class BibliographySection(BaseNode):
+    """Bibliography section in DOCX.
+
+    Represents the "Список литературы" section containing all
+    cited references in order.
+
+    Attributes:
+        heading: Section heading (default: "Список литературы").
+        entries: All cited entries in order of first citation.
+        style: Citation style (numeric or author-year).
+    """
+
+    node_type: NodeType = NodeType.BIBLIOGRAPHY_SECTION
+    heading: str = "Список литературы"
+    entries: list[BibliographyEntry] = Field(default_factory=list)
+    style: CitationStyle = CitationStyle.NUMERIC
+
+
 class ChapterContext(BaseModel):
     """Context for chapter-aware numbering.
 
@@ -378,6 +471,7 @@ InlineNode = (
     | Bookmark
     | CrossRefNode
     | CrossReference
+    | CitationNode
 )
 
 
@@ -401,6 +495,8 @@ IRNode = (
     | CrossRefNode
     | Caption
     | TOCNode
+    | CitationNode
+    | BibliographySection
 )
 
 

@@ -6,6 +6,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from .ir.model import CitationStyle
+
 
 class MathMode(StrEnum):
     """Math rendering mode configuration.
@@ -57,6 +59,7 @@ class Config(BaseModel):
         dump_json: Dump raw JSON from Typst.
         strict_mode: Enable strict mode (exit on errors).
         math_mode: Math rendering mode (native, image, or fallback).
+        bibliography_style: Citation style (numeric or author-year).
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR).
         ref_labels: Localized reference label names for GOST formatting.
         benchmark_mode: Enable benchmark mode for performance measurement.
@@ -71,6 +74,7 @@ class Config(BaseModel):
     dump_json: bool = False
     strict_mode: bool = False
     math_mode: MathMode = MathMode.FALLBACK
+    bibliography_style: CitationStyle = CitationStyle.NUMERIC
     log_level: str = "INFO"
     ref_labels: RefLabels = Field(default_factory=RefLabels)
     benchmark_mode: bool = False

@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from .config import Config, MathMode, RefLabels
+from .ir.model import CitationStyle
 from .ingest.project_loader import TypstProjectLoader
 from .logging import setup_logging
 from .parser.extractor_v2 import TypstExtractorV2
@@ -38,6 +39,9 @@ def convert(
     math_mode: MathMode = typer.Option(
         MathMode.FALLBACK, "--math-mode", help="Math rendering mode"
     ),
+    bibliography_style: CitationStyle = typer.Option(
+        CitationStyle.NUMERIC, "--bibliography-style", help="Citation style (numeric or author-year)"
+    ),
     log_level: str = typer.Option("INFO", "--log-level", help="Log level"),
     benchmark: bool = typer.Option(False, "--benchmark", help="Enable benchmark mode"),
 ) -> None:
@@ -62,6 +66,7 @@ def convert(
         dump_json=dump_json,
         strict_mode=strict,
         math_mode=math_mode,
+        bibliography_style=bibliography_style,
         log_level=log_level,
         ref_labels=RefLabels(),
         benchmark_mode=benchmark,

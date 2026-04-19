@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-04-19
+## [0.2.0] - 2026-04-20
 
 ### 🎉 Feature Complete - Release Ready
 
@@ -54,14 +54,26 @@ This release brings comprehensive academic document support with improved math r
 #### Bidirectional Validation
 - Reference validation (undefined references detection)
 - Label usage tracking (unused labels warning)
+- Citation key validation (missing bibliography entries detection)
 - Strict mode: fail on validation errors
 - Detailed validation reporting with file and line information
+
+#### Bibliography Support
+- BibTeX file support (.bib files) with custom parser
+- Inline citations with @[key] syntax
+- Two citation styles: numeric ([1], [2]) and author-year (Smith, 2023)
+- Bibliography section formatting per ГОСТ 7.32-2017
+- Alphabetical sorting for author-year style
+- Placeholder text for incomplete entries ([Без автора], [Без названия])
+- Citation key validation with warnings for missing entries
 
 #### CLI Flags
 - `--math-mode [native|fallback]`: Math rendering mode
 - `--strict`: Enable strict validation mode
 - `--benchmark`: Run performance benchmark
 - `--debug`: Enable debug mode with file tree logging
+- `--bibliography PATH`: Path to BibTeX bibliography file
+- `--bibliography-style [numeric|author-year]`: Citation style for bibliography (default: numeric)
 
 #### Performance & Testing
 - Performance benchmarking with pytest-benchmark
@@ -75,7 +87,10 @@ This release brings comprehensive academic document support with improved math r
 - New parser architecture: TypstQueryParser + RegexFallbackParser + UnifiedParser
 - Enhanced label parsing (supports labels with colons and hyphens)
 - Improved error handling for edge cases
-- Added inline comments to complex code sections (tables.py, math_renderer.py)
+- Added inline comments to complex code sections (tables.py, math_renderer.py, bibliography.py, docx_writer.py)
+- Bibliography parser with LaTeX command stripping and special character handling
+- Citation key validation integrated into ReferenceValidator
+- Placeholder text for incomplete bibliography entries
 
 ### 📝 Documentation
 

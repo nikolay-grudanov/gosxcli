@@ -37,11 +37,13 @@ class TypstScanner:
             ("TABLE_START", r"#table\("),  # standalone
             ("TABLE_START", r"(\n  table\()"),  # nested (normalize)
             ("OUTLINE_START", r"#outline\("),
+            ("BIBLIOGRAPHY_START", r'#bibliography\s*\("([^"]+)"\)'),  # Bibliography file loading
             ("HEADING", r"={1,6}\s+"),
             ("BULLET", r"-\s"),
             ("NUMBERED", r"\d+\.\s"),
             ("NEWLINE", r"\n"),
             ("LABEL", r"<([\w:-]+)>"),
+            ("CITATION", r"@\[[\w:-]+\]"),  # Bibliography citation: @[key] including brackets
             ("REF", r"@[a-zA-Z0-9_-]+"),
             ("REF_INLINE", r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"),
             ("BLOCK_MATH_DELIM", r"\$\$"),

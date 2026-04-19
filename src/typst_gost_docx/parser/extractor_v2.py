@@ -1,5 +1,6 @@
 """State-machine based Typst extractor."""
 
+import logging
 import uuid
 from typing import Optional, List, Any
 from enum import Enum, auto
@@ -23,9 +24,12 @@ from ..ir.model import (
     Equation,
     CrossReference,
     TOCNode,
+    CitationNode,
+    BibliographySection,
     NodeType,
     NumberingKind,
     ListKind,
+    CitationStyle,
     SourceLocation,
 )
 from .scanner import TypstScanner
@@ -58,6 +62,13 @@ class TypstExtractorV2:
         self.paren_stack: List[int] = []
         self.bracket_stack: List[int] = []
         self.current_label: Optional[str] = None
+
+        # Citation tracking
+        self._citation_keys: dict[str, int] = {}  # key -> number
+        self._citation_order: list[str] = []  # keys in order of first appearance
+
+        # Logger for warnings
+        self.logger = logging.getLogger("typst_gost_docx")
 
     def extract(self) -> Document:
         """Extract document structure from tokens.
@@ -93,12 +104,18 @@ class TypstExtractorV2:
                 outline = self._extract_outline()
                 if outline:
                     blocks.append(outline)
+            elif token.type == "BIBLIOGRAPHY_START":
+                bibliography = self._extract_bibliography()
+                if bibliography:
+                    blocks.append(bibliography)
             elif token.type == "BLOCK_MATH_DELIM":
                 equation = self._extract_equation()
                 if equation:
                     blocks.append(equation)
             elif token.type == "LABEL":
                 self._process_label()
+            elif token.type == "CITATION":
+                self._extract_citation()
             elif token.type == "REF_INLINE":
                 ref = self._extract_ref()
                 if ref:
@@ -185,6 +202,14 @@ class TypstExtractorV2:
             if token.type == "NEWLINE":
                 self.pos += 1
                 break
+            elif token.type == "CITATION":
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                citation = self._extract_citation()
+                if citation:
+                    nodes.append(citation)
             elif token.type == "REF":
                 if current_text.strip():
                     nodes.extend(self._parse_inline_formatting(current_text))
@@ -515,6 +540,75 @@ class TypstExtractorV2:
 
         return toc_node
 
+    def _extract_bibliography(self) -> Optional[BibliographySection]:
+        """Extract bibliography section from #bibliography() command.
+
+        Parses #bibliography("file.bib") and loads the BibTeX file.
+
+        Returns:
+            IR BibliographySection or None
+        """
+        token = self.tokens[self.pos]
+        token_value = token.value
+
+        # Extract path from token value like #bibliography("refs.bib")
+        import re
+
+        bib_path_match = re.search(r'"([^"]+\.bib)"', token_value)
+        if not bib_path_match:
+            self.logger.warning("No .bib file path found in #bibliography()")
+            self.pos += 1
+            return None
+
+        bib_file_path = bib_path_match.group(1)
+
+        # Skip past the token
+        self.pos += 1
+
+        # Resolve relative path from project root
+        from pathlib import Path
+
+        bib_path = Path(self.file_path).parent / bib_file_path
+
+        # Load and parse BibTeX file
+        if not bib_path.exists():
+            self.logger.warning(f"Bibliography file not found: {bib_path}")
+            return None
+
+        try:
+            bib_content = bib_path.read_text(encoding="utf-8")
+        except Exception as e:
+            self.logger.warning(f"Failed to read bibliography file: {e}")
+            return None
+
+        # Parse bibliography
+        from .bibliography import parse_bibliography
+
+        bib_file = parse_bibliography(bib_content)
+
+        if bib_file.parse_errors:
+            for error in bib_file.parse_errors:
+                self.logger.warning(f"BibTeX parse error: {error}")
+
+        # Create BibliographySection with only the cited entries
+        # Filter entries to only include those that were actually cited
+        cited_entries = []
+        for key in self._citation_order:
+            if key in bib_file.entries:
+                cited_entries.append(bib_file.entries[key])
+
+        bib_section = BibliographySection(
+            id=str(uuid.uuid4()),
+            heading="Список литературы",
+            entries=cited_entries,
+            style=CitationStyle.NUMERIC,
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
+        )
+
+        return bib_section
+
     def _process_label(self) -> None:
         """Process label token."""
         token = self.tokens[self.pos]
@@ -549,6 +643,44 @@ class TypstExtractorV2:
 
         self.pos += 1
         return None
+
+    def _extract_citation(self) -> Optional[CitationNode]:
+        """Extract citation from tokens.
+
+        Parses @[key] pattern and assigns sequential citation numbers.
+
+        Returns:
+            IR CitationNode or None
+        """
+        token = self.tokens[self.pos]
+        token_value = token.value
+
+        # Extract key from @[key] pattern (including brackets)
+        if token_value.startswith("@[") and token_value.endswith("]"):
+            key = token_value[2:-1]
+        else:
+            self.pos += 1
+            return None
+
+        # Assign citation number (sequential, starting from 1)
+        if key not in self._citation_keys:
+            self._citation_keys[key] = len(self._citation_keys) + 1
+            self._citation_order.append(key)
+
+        citation_number = self._citation_keys[key]
+
+        citation = CitationNode(
+            node_type=NodeType.CITATION,
+            id=str(uuid.uuid4()),
+            key=key,
+            number=citation_number,
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
+        )
+
+        self.pos += 1
+        return citation
 
     def _parse_columns_spec(self, content: str) -> list[ColSpec]:
         """Parse columns specification from table content.
