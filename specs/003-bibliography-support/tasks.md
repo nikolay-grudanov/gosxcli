@@ -27,9 +27,9 @@ description: "Task list for Bibliography Support feature implementation"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 [P] Create test fixtures directory `tests/fixtures/typ/bibliography/`
-- [ ] T002 [P] Create test fixtures directory `tests/fixtures/docx/bibliography/`
-- [ ] T003 Create BibTeX test fixture `tests/fixtures/typ/bibliography/refs.bib` with article, book, inproceedings entries
+- [x] T001 [P] Create test fixtures directory `tests/fixtures/typ/bibliography/` ✅
+- [x] T002 [P] Create test fixtures directory `tests/fixtures/docx/bibliography/` ✅
+- [x] T003 Create BibTeX test fixture `tests/fixtures/typ/bibliography/refs.bib` with article, book, inproceedings entries ✅
 
 ---
 
