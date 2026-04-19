@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "typst-gost-docx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Typst to DOCX converter for academic documents with GOST styling"
 readme = "README.md"
 license = {text = "MIT"}
@@ -25,12 +25,14 @@ dependencies = [
     "python-docx>=1.1.0",
     "lxml>=4.9.0",
     "rich>=13.0.0",
+    "latex2mathml>=3.76.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-benchmark>=4.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]

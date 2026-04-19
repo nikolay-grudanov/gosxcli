@@ -7,8 +7,6 @@ from ..ir.model import (
     Section,
     Paragraph,
     TextRun,
-    ListBlock,
-    ListItem,
     Figure,
     Caption,
     Table,
@@ -267,7 +265,6 @@ class TypstJsonToIRConverter:
         Returns:
             IR Equation
         """
-        block = node.get("block", False)
         body = node.get("body", {})
         label = node.get("label", "")
 

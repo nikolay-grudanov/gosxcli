@@ -2,8 +2,7 @@
 
 from typst_gost_docx.parser.labels import LabelExtractor
 from typst_gost_docx.parser.refs import RefResolver
-from typst_gost_docx.parser.scanner import TypstScanner
-from typst_gost_docx.parser.extractor import TypstExtractor
+from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 
 
 def test_label_extraction():
@@ -62,8 +61,7 @@ def test_figure_with_label():
   caption: [Results],
 ) <fig:results>
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 
@@ -80,8 +78,7 @@ def test_table_with_label():
   [1][2],
 ) <table:data>
 """
-    scanner = TypstScanner(text)
-    extractor = TypstExtractor(scanner, "test.typ")
+    extractor = TypstExtractorV2(text, "test.typ")
 
     doc = extractor.extract()
 

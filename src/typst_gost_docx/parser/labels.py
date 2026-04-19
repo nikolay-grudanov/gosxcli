@@ -19,8 +19,8 @@ class LabelExtractor:
     def extract_labels_and_refs(self, text: str) -> list[BaseNode]:
         nodes = []
 
-        label_pattern = r"<(\w+)>"
-        ref_pattern = r"@(\w+)"
+        label_pattern = r"<([\w:_-]+)>"
+        ref_pattern = r"@([\w:]+)"
 
         for match in re.finditer(label_pattern, text):
             label = match.group(1)
@@ -28,17 +28,16 @@ class LabelExtractor:
                 id=str(uuid.uuid4()),
                 name=label,
                 label=label,
-                source_location=SourceLocation(self.file_path, 0, 0),
+                source_location=SourceLocation(file_path=self.file_path, line=0, column=0),
             )
             nodes.append(bookmark)
-            self.cross_ref_map.register(label, bookmark)
 
         for match in re.finditer(ref_pattern, text):
             target = match.group(1)
             ref = CrossReference(
                 id=str(uuid.uuid4()),
                 target_label=target,
-                source_location=SourceLocation(self.file_path, 0, 0),
+                source_location=SourceLocation(file_path=self.file_path, line=0, column=0),
             )
             nodes.append(ref)
 

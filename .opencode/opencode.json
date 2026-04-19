@@ -1,13 +1,22 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [".opencode/rules/*.md"],
-  "small_model": "lmstudio/gemma-4-e4b-it",
+  "default_agent": "gosxcli-orchestrator",
   "agent": {
-    "general": {
-      "model": "minimax/MiniMax-M2.5"
+    "gosxcli-orchestrator": {
+      "model": "minimax/MiniMax-M2.7"
     },
-    "explore": {
-      "model": "minimax/MiniMax-M2.5"
+    "gosxcli-researcher": {
+      "model": "zai-coding-plan/glm-4.7",
+      "hidden": true
+    },
+    "gosxcli-developer": {
+      "model": "minimax/MiniMax-M2.5",
+      "hidden": true
+    },
+    "gosxcli-reviewer": {
+      "model": "zai-coding-plan/glm-4.7",
+      "hidden": true
     }
   }
 }
