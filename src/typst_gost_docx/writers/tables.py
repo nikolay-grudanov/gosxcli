@@ -190,9 +190,8 @@ class TablesManager:
 
             word_cell = word_table.rows[row_idx].cells[col_idx]
 
-            # Set cell content
-            cell_text = self._cell_content_to_text(cell.content)
-            word_cell.text = cell_text
+            # Set cell content (may contain nested tables)
+            self._write_cell_content(word_cell, cell.content)
 
             # Apply cell attributes
             self._set_cell_colspan(word_cell, cell.colspan)
@@ -237,9 +236,8 @@ class TablesManager:
 
             word_cell = word_table.rows[row_idx].cells[col_idx]
 
-            # Set cell content
-            cell_text = self._cell_content_to_text(cell.content)
-            word_cell.text = cell_text
+            # Set cell content (may contain nested tables)
+            self._write_cell_content(word_cell, cell.content)
 
             # Apply cell attributes
             self._set_cell_colspan(word_cell, cell.colspan)
@@ -401,6 +399,168 @@ class TablesManager:
             tc_borders.append(border)
 
         tc_pr.append(tc_borders)
+
+    def _write_cell_content(self, word_cell: Any, nodes: list[IRNode]) -> None:
+        """Write cell content to Word cell.
+
+        Handles plain text and nested tables.
+
+        Args:
+            word_cell: Word table cell object.
+            nodes: List of IR content nodes.
+        """
+        # Check if any node is a TableNode (nested table)
+        from ..ir.model import TableNode as IRTable
+
+        table_nodes: list[IRTable] = [node for node in nodes if isinstance(node, IRTable)]
+
+        if table_nodes:
+            # Handle nested tables
+            for table_node in table_nodes:
+                self._add_nested_table(word_cell, table_node)
+        else:
+            # Handle plain text content
+            text_parts: list[str] = []
+            for node in nodes:
+                if isinstance(node, IRTable):
+                    # This should not happen since we already filtered out tables
+                    continue
+                if hasattr(node, "text"):
+                    text_parts.append(node.text)
+                elif hasattr(node, "code"):
+                    text_parts.append(node.code)
+                elif hasattr(node, "content"):
+                    # Recursively handle nested content
+                    if isinstance(node.content, list):
+                        text_parts.append(self._cell_content_to_text(node.content))
+                    else:
+                        text_parts.append(str(node.content))
+            word_cell.text = "".join(text_parts)
+
+    def _add_nested_table(self, word_cell: Any, table: IRTable) -> None:
+        """Add a nested table inside a Word cell using lxml.
+
+        Args:
+            word_cell: Word table cell object.
+            table: IR table node to nest.
+        """
+        # Get the cell's tc element (OpenXML)
+        tc = word_cell._tc
+
+        # Create nested table element
+        nested_tbl = OxmlElement("w:tbl")
+
+        # Add basic table properties
+        tbl_pr = OxmlElement("w:tblPr")
+        tbl_style = OxmlElement("w:tblStyle")
+        tbl_style.set(qn("w:val"), "TableGrid")
+        tbl_pr.append(tbl_style)
+        nested_tbl.append(tbl_pr)
+
+        # Add table grid
+        tbl_grid = OxmlElement("w:tblGrid")
+        nested_tbl.append(tbl_grid)
+
+        # Calculate number of columns
+        num_cols = self._calculate_num_columns(table)
+        for i in range(num_cols):
+            grid_col = OxmlElement("w:gridCol")
+            # Set default width (can be adjusted based on ColSpec)
+            grid_col.set(qn("w:w"), "2267")  # ~0.5 inch in EMU
+            tbl_grid.append(grid_col)
+
+        # Add rows to nested table
+        # Header row
+        row_idx = 0
+        if table.has_header and table.header and table.header.cells:
+            self._add_nested_table_row(nested_tbl, table.header.cells, row_idx, True)
+            row_idx += 1
+
+        # Data rows
+        for table_row in table.rows:
+            self._add_nested_table_row(nested_tbl, table_row, row_idx, False)
+            row_idx += 1
+
+        # Append the nested table to the cell
+        # Note: We need to add it to the cell's p (paragraph) or create a new p
+        # For simplicity, we'll append it to the cell's content
+        tc.append(nested_tbl)
+
+    def _add_nested_table_row(
+        self,
+        nested_tbl: Any,
+        cells: list[TableCellNode],
+        row_idx: int,
+        is_header: bool,
+    ) -> None:
+        """Add a row to nested table.
+
+        Args:
+            nested_tbl: OpenXML table element.
+            cells: List of cells to add.
+            row_idx: Row index (for cell references).
+            is_header: Whether this is a header row.
+        """
+        tr = OxmlElement("w:tr")
+        nested_tbl.append(tr)
+
+        for cell in cells:
+            tc = OxmlElement("w:tc")
+            tr.append(tc)
+
+            # Add cell properties
+            tc_pr = OxmlElement("w:tcPr")
+            tc.append(tc_pr)
+
+            # Set colspan
+            if cell.colspan > 1:
+                grid_span = OxmlElement("w:gridSpan")
+                grid_span.set(qn("w:val"), str(cell.colspan))
+                tc_pr.append(grid_span)
+
+            # Set borders
+            self._add_nested_cell_borders(tc_pr)
+
+            # Add cell content (paragraph)
+            p = OxmlElement("w:p")
+            tc.append(p)
+
+            # Add paragraph properties (alignment)
+            p_pr = OxmlElement("w:pPr")
+            p.append(p_pr)
+
+            alignment = "center" if is_header else (cell.align or "left")
+            jc = OxmlElement("w:jc")
+            jc.set(qn("w:val"), alignment)
+            p_pr.append(jc)
+
+            # Add run with text
+            r = OxmlElement("w:r")
+            p.append(r)
+
+            # Add text
+            cell_text = self._cell_content_to_text(cell.content)
+            t = OxmlElement("w:t")
+            t.set(qn("xml:space"), "preserve")
+            t.text = cell_text
+            r.append(t)
+
+    def _add_nested_cell_borders(self, tc_pr: Any) -> None:
+        """Add borders to nested table cell.
+
+        Args:
+            tc_pr: OpenXML tcPr element.
+        """
+        tc_borders = OxmlElement("w:tcBorders")
+        tc_pr.append(tc_borders)
+
+        for border_name in ["top", "left", "bottom", "right"]:
+            border = OxmlElement(f"w:{border_name}")
+            border.set(qn("w:val"), "single")
+            border.set(qn("w:sz"), "4")  # 0.5pt
+            border.set(qn("w:space"), "0")
+            border.set(qn("w:color"), "auto")
+            tc_borders.append(border)
 
     def _cell_content_to_text(self, nodes: list[IRNode]) -> str:
         """Convert cell content nodes to plain text.

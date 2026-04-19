@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-04-19
 **Version:** v0.2.0 (In Progress)
-**Status:** Active Development - All tests passing (110/110)
+**Status:** Active Development - All tests passing (114/114)
 
 ---
 
@@ -18,11 +18,11 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
 - 🟢 Healthy
 
 ### Key Metrics
-- Lines of Code: ~3,400
-- Test Files: 12 (test_multifile.py, test_table_attributes.py, test_validator.py, test_cli_validation.py added, test_extractor_v2.py, test_inline_parsing.py, test_inline_rendering.py, test_smoke.py, test_refs.py, test_tables.py, test_equations.py, real_vkr/)
-- Test Cases: 110 (all passing: 48 existing + 14 multifile + 12 table attributes + 19 validation tests)
+- Lines of Code: ~3,600
+- Test Files: 13 (test_multifile.py, test_table_attributes.py, test_validator.py, test_cli_validation.py, test_nested_tables.py added, test_extractor_v2.py, test_inline_parsing.py, test_inline_rendering.py, test_smoke.py, test_refs.py, test_tables.py, test_equations.py, real_vkr/)
+- Test Cases: 114 (all passing: 48 existing + 14 multifile + 12 table attributes + 19 validation + 4 nested tables)
 - Ruff Errors: 0
-- Mypy: Passing (--strict mode enabled for extractor_v2.py, model.py, test_table_attributes.py, validator.py)
+- Mypy: Passing (--strict mode enabled for extractor_v2.py, model.py, test_table_attributes.py, validator.py, scanner.py, tables.py)
 
 ---
 
@@ -52,6 +52,8 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
 | Table of Contents | ✅ Complete | T056-T057: #outline() parsing and DOCX TOC generation |
 | Multi-file support | ✅ Complete | T024-T027: #include recursive loading with depth protection |
 | CLI flags | ✅ Complete | T063-T065: --math-mode, --strict, --debug |
+| Nested tables | ✅ Complete | T048-T049: Table detection in figures, nested table generation in cells |
+| Enhanced label parsing | ✅ Complete | Updated scanner patterns to support labels with colons and hyphens |
 
 
 ### v0.3 (Planned)
@@ -140,72 +142,20 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
   - Created writers/math_renderer.py with render() and render_to_element()
 - [x] Implement CLI flags T063-T065 (Completed: 2026-04-19) ✅
   - Added --math-mode, --strict flags to CLI
-
-### Recently Completed
-- ✅ Project architecture defined (Completed: 2026-04-18)
-- ✅ Constitution v1.0.0 ratified (Completed: 2026-04-18)
-- ✅ Phase 1 Setup complete (T001-T005): latex2mathml, fixtures/real_vkr/, benchmarks/, tests/regression/
-- ✅ Phase 2 Foundational complete (T006-T016): IR model updated with new entities, config migrated to Pydantic v2
-- ✅ Inline formatting tests T066-T068 (Completed: 2026-04-19)
-- ✅ All 62 tests passing (Completed: 2026-04-19)
-- ✅ Fixed: LabelExtractor regex for labels with colons and hyphens (labels.py)
-- ✅ Fixed: _extract_until_matching_paren() paren counting (extractor_v2.py)
-- ✅ Fixed: labels.py regex to capture `[\w:_-]+` instead of `[\w:]+`
-- ✅ Fixed: scanner nested table matching pattern
-- ✅ Updated test_real_vkr.py tables test to document nested table limitation
-- ✅ Created TypstQueryParser with typst query support (Completed: 2026-04-19)
-- ✅ Created RegexFallbackParser using scanner + extractor_v2 (Completed: 2026-04-19)
-- ✅ Created UnifiedParser as primary interface (Completed: 2026-04-19)
-- ✅ Multi-file Typst project loading with #include support (Completed: 2026-04-19)
-  - T024-T027: Implemented recursive loading, depth protection, relative path resolution, debug logging
-  - Updated TypstProjectLoader with _load_includes() and _parse_includes() methods
-  - Added strict_mode parameter for error handling
-  - Protected against cyclic references using loaded_files set
-  - All 62 tests passing (48 existing + 14 new multifile tests)
-- ✅ CLI flags T063-T065 (Completed: 2026-04-19)
-  - T063: Added `--math-mode [native|image|fallback]` flag to CLI
-  - T064: Added `--strict` flag to CLI with exit code 1 on unresolved references
-  - T065: `--debug` flag already existed
-  - Updated DocxWriter to accept and use math_mode parameter
-  - Implemented math rendering logic in _write_equation() for all modes
-  - Added strict mode validation in _run_conversion()
-  - CLI help updated to show new flags
-- ✅ Table attributes parsing T034-T039, T047 (Completed: 2026-04-19)
-  - Added `border_width` field to TableNode in IR model
-  - Implemented `_parse_columns_spec()` for parsing various column formats: (1fr, 2fr), (17%, 83%), (auto, 1fr, 20%)
-  - Implemented `_parse_stroke_spec()` for parsing stroke: 0.7pt
-  - Implemented `_parse_fill_lambda()` for parsing fill lambda patterns: (col, row) => if row == 0 { luma(220) }
-  - Implemented `_parse_align_lambda()` for parsing align lambda patterns: (col, row) => if row == 0 { center }
-  - Updated `_extract_row_cells()` to support table.cell(colspan: N)[...] and table.cell(rowspan: N)[...]
-  - Updated `_extract_header_cells()` to apply fill and align attributes from lambda expressions
-  - Added 12 comprehensive tests for table attributes (test_table_attributes.py)
-  - All 74 tests passing (48 existing + 14 multifile + 12 table attributes)
-- ✅ Tables colspan/rowspan implementation T040-T046 (Completed: 2026-04-19)
-  - Updated TablesManager to use TableNode.columns, header, rows
-  - Implemented _set_cell_colspan() for gridSpan
-  - Implemented _set_cell_rowspan() for vMerge
-  - Implemented _set_cell_borders() for tcBorders
-  - Implemented _set_cell_fill() for shd (header shading)
-  - Implemented _set_cell_alignment() for jc (alignment)
-  - Implemented _set_table_grid() for column widths via tblGrid
-  - All 84 tests passing (48 existing + 14 multifile + 12 table attributes + 10 chapter-aware)
-- ✅ Chapter-aware references T050-T055 (Completed: 2026-04-19)
-  - Added number and chapter_number fields to Figure, TableNode, Equation, Caption, CrossRefNode, Section
-  - Integrated ChapterContext in DocxWriter for tracking chapter numbers and counters
-  - Updated _write_section to increment chapter_number and reset counters on level 1 headings
-  - Updated _write_figure, _write_table, _write_equation to increment counters
-  - Added ref_labels configuration for localized reference text
-  - Implemented _write_cross_ref_node with chapter-aware numbering
-  - Implemented _format_cross_ref for localized formatting ("Рисунок 1.2", "Таблица 2.1")
-  - Updated RefResolver to process CrossRefNode
-  - Added 10 comprehensive tests (test_chapter_aware_refs.py)
-  - All 84 tests passing
-- ✅ MathRenderer module T028-T031 (Completed: 2026-04-19)
-  - Created writers/math_renderer.py module
-  - Implemented MathRenderer class with render() and render_to_element() methods
-  - Supports native, fallback, and image modes
-  - Uses latex2mathml for LaTeX to OMML conversion
-  - Implements text fallback for failed rendering
+- [x] Implement nested tables T048-T049 (Completed: 2026-04-19) ✅
+  - Updated IR model: Added `table` field to Figure for nested tables
+  - Parser: Added `_extract_nested_table_from_figure()` to detect tables inside #figure()
+  - Parser: Updated `_extract_figure()`, `_extract_table()`, `_extract_equation()` to handle inline labels
+  - Scanner: Updated LABEL pattern from `<([\w:]+)>` to `<([\w:-]+)>` to support labels with hyphens
+  - Writer: Updated `_write_figure()` to handle tables instead of images
+  - Writer: Added `_write_cell_content()` method to handle nested tables in cells
+  - Writer: Added `_add_nested_table()`, `_add_nested_table_row()`, `_add_nested_cell_borders()` for nested table generation
+  - Added 4 comprehensive tests for nested tables (test_nested_tables.py)
+  - All 114 tests passing (48 existing + 14 multifile + 12 table attributes + 10 chapter-aware + 7 TOC + 19 validation + 4 nested tables)
+- [x] Enhanced label parsing (Completed: 2026-04-19) ✅
+  - Updated scanner.py LABEL pattern to support colons and hyphens in labels
+  - Fixed label handling for figures, tables, and equations with inline labels
+  - All 114 tests passing
 
 ---
 
@@ -230,8 +180,7 @@ gosxcli — CLI-инструмент для конвертации Typst-док�
 ## Next Steps
 
 ### Phase 3 Completion
-- [ ] T048-T049: Nested tables detection and generation
-- [ ] Run full test suite and verify 110+ tests pass
+- [ ] Run full test suite and verify 114+ tests pass
 - [ ] Code review by @gosxcli-reviewer
 
 ### Short Term (Next 2 Weeks)

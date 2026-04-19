@@ -41,7 +41,7 @@ class TypstScanner:
             ("BULLET", r"-\s"),
             ("NUMBERED", r"\d+\.\s"),
             ("NEWLINE", r"\n"),
-            ("LABEL", r"<([a-zA-Z0-9_-]+)>"),
+            ("LABEL", r"<([\w:-]+)>"),
             ("REF", r"@[a-zA-Z0-9_-]+"),
             ("REF_INLINE", r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"),
             ("BLOCK_MATH_DELIM", r"\$\$"),

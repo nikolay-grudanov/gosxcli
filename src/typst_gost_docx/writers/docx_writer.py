@@ -170,6 +170,20 @@ class DocxWriter:
             self.doc.add_paragraph(text, style=style)
 
     def _write_figure(self, figure: Figure) -> None:
+        # Check if figure contains a table instead of an image
+        if figure.table:
+            # Treat table figure as a table (uses table counter)
+            self._write_table(figure.table)
+            # Update figure's caption number with table's number
+            if figure.caption:
+                figure.caption.number = figure.table.number
+                figure.caption.chapter_number = figure.table.chapter_number
+            # Write caption if present
+            if figure.caption:
+                self._write_caption(figure.caption)
+            return
+
+        # Regular image figure
         self.stats["figures"] += 1
 
         # Increment figure counter and store in figure

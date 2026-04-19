@@ -265,19 +265,35 @@ class TypstExtractorV2:
         image_path = self._extract_image_path(content)
         caption_text = self._extract_caption_text(content)
 
+        # Check if figure contains a nested table
+        nested_table = self._extract_nested_table_from_figure(content)
+
         if image_path:
             figure.image_path = image_path
+        elif nested_table:
+            # Figure contains a table instead of an image
+            figure.table = nested_table
 
         if caption_text:
             figure.caption = Caption(
                 id=str(uuid.uuid4()),
                 text=caption_text,
-                numbering_kind=NumberingKind.FIGURE,
+                numbering_kind=NumberingKind.TABLE if nested_table else NumberingKind.FIGURE,
             )
 
+        # Check for label immediately after figure
+        # Labels can appear as <label> or be set via current_label
         if self.current_label:
             figure.label = self.current_label
             self.current_label = None
+        elif self.pos < len(self.tokens) and self.tokens[self.pos].type == "LABEL":
+            # Process label token that appears right after figure
+            label_token = self.tokens[self.pos]
+            label_match = label_token.value
+            if label_match.startswith("<") and label_match.endswith(">"):
+                label_name = label_match[1:-1].strip()
+                figure.label = label_name
+            self.pos += 1
 
         return figure
 
@@ -328,9 +344,103 @@ class TypstExtractorV2:
                 if row_cells:
                     table.rows.append(row_cells)
 
+        # Check for label immediately after table
+        # Labels can appear as <label> or be set via current_label
         if self.current_label:
             table.label = self.current_label
             self.current_label = None
+        elif self.pos < len(self.tokens) and self.tokens[self.pos].type == "LABEL":
+            # Process label token that appears right after table
+            label_token = self.tokens[self.pos]
+            label_match = label_token.value
+            if label_match.startswith("<") and label_match.endswith(">"):
+                label_name = label_match[1:-1].strip()
+                table.label = label_name
+            self.pos += 1
+
+        return table
+
+    def _extract_nested_table_from_figure(self, content: str) -> Optional[TableNode]:
+        """Extract nested table from figure content.
+
+        Looks for `table(` pattern inside figure content and extracts it as TableNode.
+
+        Args:
+            content: Figure content string (inside #figure(...))
+
+        Returns:
+            IR TableNode or None if no table found
+        """
+        import re
+
+        # Look for table( pattern (with or without leading #)
+        table_match = re.search(r"table\s*\(", content)
+        if not table_match:
+            return None
+
+        # Extract table content from the opening table( to matching closing paren
+        table_start = table_match.start()
+        paren_count = 0
+        in_table = False
+        table_content = ""
+
+        i = table_start
+        while i < len(content):
+            char = content[i]
+
+            if char == "(":
+                if not in_table:
+                    in_table = True
+                paren_count += 1
+            elif char == ")":
+                paren_count -= 1
+                if in_table and paren_count == 0:
+                    # Found the matching closing paren
+                    break
+
+            if in_table:
+                table_content += char
+
+            i += 1
+
+        if not table_content:
+            return None
+
+        # Now parse the table content (similar to _extract_table logic)
+        table = TableNode(
+            id=str(uuid.uuid4()),
+            source_location=SourceLocation(
+                file_path=self.file_path,
+                line=self.tokens[self.pos - 1].line if self.pos > 0 else 0,
+                column=0,
+            ),
+        )
+
+        # Parse table attributes
+        table.columns = self._parse_columns_spec(table_content)
+        table.border_width = self._parse_stroke_spec(table_content)
+        fill_lambda = self._parse_fill_lambda(table_content)
+        align_lambda = self._parse_align_lambda(table_content)
+
+        lines = table_content.split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            if "table.header(" in line:
+                header_cells = self._extract_header_cells(line, fill_lambda, align_lambda)
+                if header_cells:
+                    table.header = TableHeaderNode(
+                        id=str(uuid.uuid4()),
+                        cells=header_cells,
+                    )
+                    table.has_header = True
+            elif line.startswith("[") or "table.cell(" in line:
+                row_cells = self._extract_row_cells(line, fill_lambda, align_lambda)
+                if row_cells:
+                    table.rows.append(row_cells)
 
         return table
 
@@ -354,9 +464,19 @@ class TypstExtractorV2:
             numbering_kind=NumberingKind.EQUATION,
         )
 
+        # Check for label immediately after equation
+        # Labels can appear as <label> or be set via current_label
         if self.current_label:
             equation.label = self.current_label
             self.current_label = None
+        elif self.pos < len(self.tokens) and self.tokens[self.pos].type == "LABEL":
+            # Process label token that appears right after equation
+            label_token = self.tokens[self.pos]
+            label_match = label_token.value
+            if label_match.startswith("<") and label_match.endswith(">"):
+                label_name = label_match[1:-1].strip()
+                equation.label = label_name
+            self.pos += 1
 
         return equation
 

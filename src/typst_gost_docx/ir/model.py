@@ -221,11 +221,15 @@ class TableNode(BaseNode):
 
 
 class Figure(BaseNode):
-    """Figure node."""
+    """Figure node.
+
+    Can contain either an image or a table (but not both).
+    """
 
     node_type: NodeType = NodeType.FIGURE
     caption: Optional["Caption"] = None
     image_path: Optional[str] = None
+    table: Optional["TableNode"] = None  # Nested table inside figure
     numbering_kind: Optional[NumberingKind] = NumberingKind.FIGURE
     number: int = 0
     chapter_number: int = 0

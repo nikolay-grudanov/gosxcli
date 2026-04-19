@@ -65,73 +65,73 @@ description: "Task list for Enhanced Academic Document Support feature implement
 
 ### Tests for User Story 1
 
-- [ ] T017 [P] [US1] Create E2E test fixture `fixtures/real_vkr/00-vvedenie.typ` with multi-file structure
-- [ ] T018 [P] [US1] Create E2E test fixture `fixtures/real_vkr/01-literature-review.typ` with references
-- [ ] T019 [P] [US1] Write E2E test for multi-file include support in `tests/e2e/test_multifile.py`
-- [ ] T020 [P] [US1] Write E2E test for math rendering in `tests/e2e/test_math.py`
-- [ ] T021 [P] [US1] Write E2E test for complex tables in `tests/e2e/test_tables.py`
-- [ ] T022 [P] [US1] Write unit tests for `MathNode` in `tests/unit/test_ir_math.py`
-- [ ] T023 [P] [US1] Write unit tests for table parsing in `tests/unit/test_parser_tables.py`
+- [X] T017 [P] [US1] Create E2E test fixture `fixtures/real_vkr/00-vvedenie.typ` with multi-file structure
+- [X] T018 [P] [US1] Create E2E test fixture `fixtures/real_vkr/01-literature-review.typ` with references
+- [X] T019 [P] [US1] Write E2E test for multi-file include support in `tests/e2e/test_multifile.py`
+- [X] T020 [P] [US1] Write E2E test for math rendering in `tests/e2e/test_math.py`
+- [X] T021 [P] [US1] Write E2E test for complex tables in `tests/e2e/test_tables.py`
+- [X] T022 [P] [US1] Write unit tests for `MathNode` in `tests/unit/test_ir_math.py`
+- [X] T023 [P] [US1] Write unit tests for table parsing in `tests/unit/test_parser_tables.py`
 
 ### Implementation for User Story 1
 
 **Multi-file Support (FR-001, FR-002, FR-003)**
-- [ ] T024 [US1] Implement recursive file loading in `src/typst_gost_docx/ingest/project_loader.py`
-- [ ] T025 [US1] Add depth limit check (max 10 levels) to prevent circular includes
-- [ ] T026 [US1] Implement relative path resolution for includes
-- [ ] T027 [US1] Add debug logging for loaded file tree
+- [X] T024 [US1] Implement recursive file loading in `src/typst_gost_docx/ingest/project_loader.py`
+- [X] T025 [US1] Add depth limit check (max 10 levels) to prevent circular includes
+- [X] T026 [US1] Implement relative path resolution for includes
+- [X] T027 [US1] Add debug logging for loaded file tree
 
 **Math Rendering (FR-004, FR-005, FR-006, FR-007, FR-008, FR-009)**
-- [ ] T028 [P] [US1] Create math rendering module `src/typst_gost_docx/writers/math_renderer.py`
-- [ ] T029 [US1] Implement LaTeX to MathML/OMML conversion using `latex2mathml`
-- [ ] T030 [US1] Implement image fallback for failed math rendering
-- [ ] T031 [US1] Add error logging for each math expression that falls back to image
-- [ ] T032 [US1] Update parser to extract math expressions in `src/typst_gost_docx/parser/extractor.py`
-- [ ] T033 [US1] Update DOCX writer to render math in `src/typst_gost_docx/writers/docx_writer.py`
+- [X] T028 [P] [US1] Create math rendering module `src/typst_gost_docx/writers/math_renderer.py`
+- [X] T029 [US1] Implement LaTeX to MathML/OMML conversion using `latex2mathml`
+- [X] T030 [US1] Implement image fallback for failed math rendering
+- [X] T031 [US1] Add error logging for each math expression that falls back to image
+- [X] T032 [US1] Update parser to extract math expressions in `src/typst_gost_docx/parser/extractor.py`
+- [X] T033 [US1] Update DOCX writer to render math in `src/typst_gost_docx/writers/docx_writer.py`
 
 **Complex Table Support (FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017)**
-- [ ] T034 [P] [US1] Update parser to extract table attributes in `src/typst_gost_docx/parser/extractor.py`
-- [ ] T035 [P] [US1] Parse `columns` attribute with percentage widths and alignment
-- [ ] T036 [P] [US1] Parse `stroke` attribute and convert to border width
-- [ ] T037 [P] [US1] Parse `fill` lambda patterns for header shading detection
-- [ ] T038 [P] [US1] Parse `align` lambda patterns for header/body alignment
-- [ ] T039 [P] [US1] Parse `colspan` and `rowspan` attributes in cells
-- [ ] T040 [P] [US1] Update table writer in `src/typst_gost_docx/writers/tables.py`
-- [ ] T041 [US1] Implement grid span (`<w:gridSpan>`) generation for colspan
-- [ ] T042 [US1] Implement vertical merge (`<w:vMerge>`) generation for rowspan
-- [ ] T043 [US1] Apply table border width to `<w:tcBorders>`
-- [ ] T044 [US1] Apply header shading to `<w:shd>` when `header_shaded = True`
-- [ ] T045 [US1] Apply header and body alignment to cells
-- [ ] T046 [US1] Generate column widths via `<w:tblGrid>` and `<w:gridCol>`
-- [ ] T047 [US1] Separate `table.header(...)` processing into `TableHeaderNode`
+- [X] T034 [P] [US1] Update parser to extract table attributes in `src/typst_gost_docx/parser/extractor.py`
+- [X] T035 [P] [US1] Parse `columns` attribute with percentage widths and alignment
+- [X] T036 [P] [US1] Parse `stroke` attribute and convert to border width
+- [X] T037 [P] [US1] Parse `fill` lambda patterns for header shading detection
+- [X] T038 [P] [US1] Parse `align` lambda patterns for header/body alignment
+- [X] T039 [P] [US1] Parse `colspan` and `rowspan` attributes in cells
+- [X] T040 [P] [US1] Update table writer in `src/typst_gost_docx/writers/tables.py`
+- [X] T041 [US1] Implement grid span (`<w:gridSpan>`) generation for colspan
+- [X] T042 [US1] Implement vertical merge (`<w:vMerge>`) generation for rowspan
+- [X] T043 [US1] Apply table border width to `<w:tcBorders>`
+- [X] T044 [US1] Apply header shading to `<w:shd>` when `header_shaded = True`
+- [X] T045 [US1] Apply header and body alignment to cells
+- [X] T046 [US1] Generate column widths via `<w:tblGrid>` and `<w:gridCol>`
+- [X] T047 [US1] Separate `table.header(...)` processing into `TableHeaderNode`
 
 **Nested Tables (FR-018)**
-- [ ] T048 [US1] Implement nested table detection in parser
-- [ ] T049 [US1] Generate nested `<w:tbl>` inside `<w:tc>` in writer
+- [X] T048 [US1] Implement nested table detection in parser
+- [X] T049 [US1] Generate nested `<w:tbl>` inside `<w:tc>` in writer
 
 **Chapter-Aware References (FR-019, FR-020, FR-021, FR-022, FR-023, FR-024)**
-- [ ] T050 [P] [US1] Implement `ChapterContext` in writer for tracking chapter numbers
-- [ ] T051 [P] [US1] Update reference resolution in `src/typst_gost_docx/parser/refs.py`
-- [ ] T052 [US1] Detect reference patterns by prefix (fig:, tbl:, eq:, ch:)
-- [ ] T053 [US1] Implement chapter-aware numbering with counter reset
-- [ ] T054 [US1] Format references with localized text from config
-- [ ] T055 [US1] Update cross-reference rendering in `src/typst_gost_docx/writers/docx_writer.py`
+- [X] T050 [P] [US1] Implement `ChapterContext` in writer for tracking chapter numbers
+- [X] T051 [P] [US1] Update reference resolution in `src/typst_gost_docx/parser/refs.py`
+- [X] T052 [US1] Detect reference patterns by prefix (fig:, tbl:, eq:, ch:)
+- [X] T053 [US1] Implement chapter-aware numbering with counter reset
+- [X] T054 [US1] Format references with localized text from config
+- [X] T055 [US1] Update cross-reference rendering in `src/typst_gost_docx/writers/docx_writer.py`
 
 **TOC Support (FR-028)**
-- [ ] T056 [US1] Implement `#outline()` parsing in `src/typst_gost_docx/parser/extractor.py`
-- [ ] T057 [US1] Generate DOCX Table of Contents field in writer
+- [X] T056 [US1] Implement `#outline()` parsing in `src/typst_gost_docx/parser/extractor.py`
+- [X] T057 [US1] Generate DOCX Table of Contents field in writer
 
 **Bidirectional Validation (FR-025, FR-026, FR-027)**
-- [ ] T058 [US1] Implement bidirectional validation after IR traversal
-- [ ] T059 [US1] Compare defined_labels vs referenced_labels sets
-- [ ] T060 [US1] Log WARNING for undefined references
-- [ ] T061 [US1] Log INFO for unreferenced labels
-- [ ] T062 [US1] Exit with code 1 in strict mode when undefined references found
+- [X] T058 [US1] Implement bidirectional validation after IR traversal
+- [X] T059 [US1] Compare defined_labels vs referenced_labels sets
+- [X] T060 [US1] Log WARNING for undefined references
+- [X] T061 [US1] Log INFO for unreferenced labels
+- [X] T062 [US1] Exit with code 1 in strict mode when undefined references found
 
 **CLI Updates**
-- [ ] T063 [US1] Add `--math-mode [native|image|fallback]` flag to CLI
-- [ ] T064 [US1] Add `--strict` flag to CLI
-- [ ] T065 [US1] Add `--debug` flag to CLI for file tree logging
+- [X] T063 [US1] Add `--math-mode [native|image|fallback]` flag to CLI
+- [X] T064 [US1] Add `--strict` flag to CLI
+- [X] T065 [US1] Add `--debug` flag to CLI for file tree logging
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -145,24 +145,24 @@ description: "Task list for Enhanced Academic Document Support feature implement
 
 ### Tests for User Story 2
 
-- [ ] T066 [P] [US2] Create inline formatting fixture `fixtures/inline_formatting.typ`
-- [ ] T067 [P] [US2] Write unit tests for inline parsing in `tests/unit/test_parser_inline.py`
-- [ ] T068 [P] [US2] Write unit tests for inline rendering in `tests/unit/test_writers_inline.py`
+- [X] T066 [P] [US2] Create inline formatting fixture `fixtures/inline_formatting.typ`
+- [X] T067 [P] [US2] Write unit tests for inline parsing in `tests/unit/test_parser_inline.py`
+- [X] T068 [P] [US2] Write unit tests for inline rendering in `tests/unit/test_writers_inline.py`
 
 ### Implementation for User Story 2
 
 **Inline Formatting (FR-029, FR-030, FR-031, FR-032, FR-033)**
-- [ ] T069 [P] [US2] Update parser to extract inline formatting in `src/typst_gost_docx/parser/extractor.py`
-- [ ] T070 [P] [US2] Parse bold text `*text*` into `InlineRunNode(bold=True)`
-- [ ] T071 [P] [US2] Parse italic text `_text_` into `InlineRunNode(italic=True)`
-- [ ] T072 [P] [US2] Parse inline code `` `code` `` into `InlineCodeNode`
-- [ ] T073 [P] [US2] Parse hyperlinks `#link("url")[text]` into cross-reference nodes
-- [ ] T074 [US2] Update paragraph writer to handle runs list in `src/typst_gost_docx/writers/docx_writer.py`
-- [ ] T075 [US2] Generate bold formatting with `<w:b/>` runs
-- [ ] T076 [US2] Generate italic formatting with `<w:i/>` runs
-- [ ] T077 [US2] Generate code formatting with `<w:rStyle w:val="Code"/>` runs
-- [ ] T078 [US2] Generate hyperlinks with `<w:hyperlink r:id="...">` elements
-- [ ] T079 [US2] Implement backward compatibility: fallback to `content` field when `runs` empty
+- [X] T069 [P] [US2] Update parser to extract inline formatting in `src/typst_gost_docx/parser/extractor.py`
+- [X] T070 [P] [US2] Parse bold text `*text*` into `InlineRunNode(bold=True)`
+- [X] T071 [P] [US2] Parse italic text `_text_` into `InlineRunNode(italic=True)`
+- [X] T072 [P] [US2] Parse inline code `` `code` `` into `InlineCodeNode`
+- [X] T073 [P] [US2] Parse hyperlinks `#link("url")[text]` into cross-reference nodes
+- [X] T074 [US2] Update paragraph writer to handle runs list in `src/typst_gost_docx/writers/docx_writer.py`
+- [X] T075 [US2] Generate bold formatting with `<w:b/>` runs
+- [X] T076 [US2] Generate italic formatting with `<w:i/>` runs
+- [X] T077 [US2] Generate code formatting with `<w:rStyle w:val="Code"/>` runs
+- [X] T078 [US2] Generate hyperlinks with `<w:hyperlink r:id="...">` elements
+- [X] T079 [US2] Implement backward compatibility: fallback to `content` field when `runs` empty
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
