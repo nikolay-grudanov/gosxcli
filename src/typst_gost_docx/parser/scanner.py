@@ -1,16 +1,24 @@
-"""Typst scanner for parsing."""
+"""Typst scanner for parsing - finds tokens in order."""
 
 import re
-from dataclasses import dataclass
-from typing import Generator
+from typing import Generator, List, Tuple
+
+from pydantic import BaseModel
 
 
-@dataclass
-class Token:
+class Token(BaseModel):
+    """Token from Typst source scanning."""
+
     type: str
     value: str
     line: int
     column: int
+
+    # Allow positional args for backward compatibility with dataclass
+    def __init__(
+        self, type: str = "", value: str = "", line: int = 0, column: int = 0, **kwargs: object
+    ) -> None:
+        super().__init__(type=type, value=value, line=line, column=column, **kwargs)
 
 
 class TypstScanner:
@@ -19,19 +27,24 @@ class TypstScanner:
         self.pos = 0
         self.line = 1
         self.column = 1
+        self._tokens: List[Token] = []
 
     def scan(self) -> Generator[Token, None, None]:
+        """Scan Typst text and yield tokens in order."""
+        # Pattern groups with their token types - more specific first
         patterns = [
+            ("FIGURE_START", r"#figure\("),
+            ("TABLE_START", r"#table\("),  # standalone
+            ("TABLE_START", r"(\n  table\()"),  # nested (normalize)
             ("HEADING", r"={1,6}\s+"),
             ("BULLET", r"-\s"),
             ("NUMBERED", r"\d+\.\s"),
-            ("NEWLINE", r"\s*\n"),
-            ("FIGURE_START", r"#figure\("),
-            ("TABLE_START", r"#table\("),
+            ("NEWLINE", r"\n"),
+            ("LABEL", r"<([a-zA-Z0-9_-]+)>"),
+            ("REF", r"@[a-zA-Z0-9_-]+"),
+            ("REF_INLINE", r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"),
             ("BLOCK_MATH_DELIM", r"\$\$"),
             ("INLINE_MATH_DELIM", r"\$"),
-            ("LABEL", r"<([a-zA-Z0-9_-]+)>"),
-            ("REF_INLINE", r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"),
             ("EMPHASIS", r"\*(.+?)\*"),
             ("STRONG", r"_(.+?)_"),
             ("INLINE_CODE", r"`[^`]+`"),
@@ -39,87 +52,52 @@ class TypstScanner:
             ("IMPORT", r'#import\s+"([^"]+)"'),
         ]
 
-        while self.pos < len(self.text):
-            matched = False
+        # Find all matches
+        all_matches: List[Tuple[int, int, str, str]] = []
 
-            # First, check if we're at the start of a line and can match line-start patterns
-            if self.column == 1:
-                for token_type, pattern in patterns:
-                    if token_type in ("HEADING", "BULLET", "NUMBERED"):
-                        regex = re.compile(pattern)
-                        match = regex.match(self.text[self.pos :])
-                        if match:
-                            yield Token(token_type, match.group(), self.line, self.column)
-                            lines = match.group().count("\n")
-                            self.line += lines
-                            self.pos += match.end()
-                            self.column = 1
-                            matched = True
-                            break
-                    elif token_type == "NEWLINE":
-                        regex = re.compile(pattern, re.MULTILINE)
-                        match = regex.match(self.text[self.pos :])
-                        if match and match.group() != "":
-                            yield Token(token_type, match.group(), self.line, self.column)
-                            lines = match.group().count("\n")
-                            self.line += lines
-                            self.pos += match.end()
-                            self.column = 1
-                            matched = True
-                            break
+        for token_type, pattern in patterns:
+            regex = re.compile(pattern)
+            for m in regex.finditer(self.text):
+                all_matches.append((m.start(), m.end(), token_type, m.group()))
 
-                if matched:
-                    continue
+        # Sort by position, then by priority (important tokens first at same pos)
+        priority = {"FIGURE_START": 0, "TABLE_START": 1}
+        all_matches.sort(key=lambda x: (x[0], priority.get(x[2], 99)))
 
-            # Now try to match other patterns (FIGURE, TABLE, MATH, etc.)
-            for token_type, pattern in patterns:
-                if token_type in ("HEADING", "BULLET", "NUMBERED"):
-                    continue  # Already handled above
+        # Remove overlaps but keep same-pos tokens
+        pos = 0
+        for start, end, ttype, value in all_matches:
+            if start < pos:
+                continue  # Skip overlap completely inside
 
-                regex = re.compile(pattern)
-                match = regex.match(self.text[self.pos :])
-                if match:
-                    yield Token(token_type, match.group(), self.line, self.column)
-                    if token_type == "NEWLINE":
-                        lines = match.group().count("\n")
-                        self.line += lines
-                        self.pos += match.end()
-                        self.column = 1
-                    else:
-                        self.pos += match.end()
-                        self.column += match.end()
-                    matched = True
-                    break
-
-            if not matched:
-                # Collect consecutive text characters (until pattern or newline)
-                text_start = self.pos
-                while self.pos < len(self.text) and self.text[self.pos] != "\n":
-                    # Check if current position starts any pattern (except line-start patterns)
-                    starts_pattern = False
-                    for token_type, pattern in patterns:
-                        if token_type in ("HEADING", "BULLET", "NUMBERED", "NEWLINE"):
-                            continue
-                        regex = re.compile(pattern)
-                        if regex.match(self.text[self.pos :]):
-                            starts_pattern = True
-                            break
-
-                    if starts_pattern:
-                        break
-
-                    self.pos += 1
-                    self.column += 1
-
-                if self.pos > text_start:
-                    yield Token(
-                        "TEXT",
-                        self.text[text_start : self.pos],
-                        self.line,
-                        self.column - (self.pos - text_start),
-                    )
+            # If there's text between previous token and this one
+            if start > pos:
+                gap = self.text[pos:start]
+                yield Token("TEXT", gap, self.line, self.column)
+                # Update line/col for gap
+                newline_count = gap.count("\n")
+                self.line += newline_count
+                if newline_count:
+                    # Simple approximation
+                    self.column = len(gap) - gap.rfind("\n")
                 else:
-                    # Single character couldn't be matched - yield as TEXT and advance
-                    yield Token("TEXT", self.text[self.pos : self.pos + 1], self.line, self.column)
-                    self.pos += 1
-                    self.column += 1
+                    self.column += len(gap)
+
+            # Yield the token
+            if ttype == "TABLE_START" and value.startswith("\n"):
+                value = "#table("  # normalize nested to standard
+
+            yield Token(ttype, value, self.line, self.column)
+
+            pos = end
+            # Update line/col after token
+            newline_count = value.count("\n")
+            self.line += newline_count
+            if newline_count:
+                self.column = 1
+            else:
+                self.column = end - start
+
+        # Final TEXT for any remaining
+        if pos < len(self.text):
+            yield Token("TEXT", self.text[pos:], self.line, self.column)
