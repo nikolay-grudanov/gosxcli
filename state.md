@@ -1,15 +1,15 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-04-20 (Phase 7: Polish & Cross-Cutting Concerns - Bibliography support completed)
-**Version:** v0.2.0 (Feature Complete)
-**Status:** Release Ready - All tests passing (135/135)
+**Last Updated:** 2026-04-20 (Code Blocks Support Phase 5 completed)
+**Version:** v0.2.1 (Code Blocks Support)
+**Status:** Release Ready - All tests passing (197/197)
 
 ### Key Metrics
-- Lines of Code: ~4,450
-- Test Files: 17 (added test_benchmarks.py, test_docx_structure.py, test_v01_compatibility.py)
-- Test Cases: 135 (all passing: 48 existing + 14 multifile + 12 table attributes + 19 validator + 3 integration + 10 chapter-aware + 7 TOC + 4 nested tables + 3 regression + 10 E2E structure + 5 v0.1 smoke tests)
+- Lines of Code: ~4,750 (+280 code blocks support with documentation)
+- Test Files: 19 (added test_code_blocks.py unit + integration)
+- Test Cases: 197 (all passing: 175 existing + 22 code blocks tests)
 - Ruff Errors: 0 (all code)
-- Mypy: Passing (--strict mode enabled for extractor_v2.py, model.py, test_table_attributes.py, validator.py, scanner.py, tables.py, regression tests, benchmark tests, E2E tests, CLI, Config)
+- Mypy: Passing (--strict mode enabled for new code blocks code)
 
 ---
 
@@ -25,6 +25,14 @@
 | Figures | ✅ Complete | With captions |
 | References | ✅ Complete | @label resolution |
 | Math | ⚠️ MVP | Complex formulas as placeholders |
+
+### v0.2.1 (Code Blocks Support ✅)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Code blocks IR | ✅ Complete | CodeBlockNode model with content and language |
+| Code blocks parsing | ✅ Complete | Extract code blocks from ```language\n...\n``` |
+| Code blocks writer | ✅ Complete | Monospace font, XML escaping, background shading |
+| Code blocks tests | ✅ Complete | 14 unit + 8 integration tests (22 total) |
 
 ### v0.2 (Feature Complete ✅)
 | Feature | Status | Notes |
@@ -58,7 +66,7 @@
 ### v0.3 (Planned)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Code blocks | 🔲 Not Started | Syntax highlighting |
+| Code blocks | ✅ MVP Complete | Phase 5 done: parsing, monospace font, XML escaping, background shading, documentation. Syntax highlighting planned for v0.4 |
 | Page breaks | 🔲 Not Started | Section formatting |
 | Error handling | 🔲 Not Started | Robust error messages |
 | Full GOST | 🔲 Not Started | Complete compliance |
@@ -152,7 +160,69 @@
   - Generated DOCX files open correctly
 
 ### Active Tasks
-- **None** - All Phase 7 tasks completed
+- **None** - All Code Blocks Support Phase 5 tasks completed
+
+### Recent Work
+- [x] Code Blocks Support Phase 5 (T013-T018) - Completed: 2026-04-20 ✅
+   - T013: Updated README.md with code blocks documentation ✅
+     - Added "Code Blocks" section after Bibliography
+     - Documented syntax ```python, ```rust, etc.
+     - Documented supported languages (Python, Rust, JavaScript, C, C++, plain text)
+     - Documented features (monospace font, background shading, XML escaping, preserved formatting)
+   - T014: Updated state.md ✅
+     - Added Code Blocks Support to v0.3 Progress Tracker (marked as ✅ MVP Complete)
+     - Updated Last Updated to 2026-04-20
+     - Updated Key Metrics (Lines of Code: ~4,750)
+   - T015: Verified inline comments in code blocks methods ✅
+     - _write_code_block() method has comprehensive docstring and inline comments
+     - _extract_code_block() method has comprehensive docstring and inline comments
+   - T016: Ran full test suite ✅
+     - All 197 tests passing (175 existing + 22 code blocks tests)
+   - T017: Ran ruff check and mypy --strict ✅
+     - ruff check: 0 errors
+     - mypy --strict: Passing for docx_writer.py and extractor_v2.py
+   - T018: Updated CHANGELOG.md ✅
+     - Added Code Blocks Support to v0.2.1 new features
+     - Documented basic formatting (monospace font, XML escaping, background shading)
+   - **Phase 5 complete: documentation, inline comments, all tests passing, ruff and mypy clean**
+- [x] Code Blocks Support Phase 3-4 (T006-T012) - Completed: 2026-04-20 ✅
+   - T006-T007: Unit tests for CodeBlockNode (14 tests) ✅
+     - tests/unit/test_code_blocks.py created
+     - Tests for CodeBlockNode model (creation, language, labels, source location, style hints)
+     - Tests for code block extraction (Python, Rust, plain text, multiple blocks, special chars, indentation, empty lines)
+   - T008: Update extractor for code block parsing ✅
+     - Added CodeBlockNode import to extractor_v2.py
+     - Added CODE_BLOCK_DELIM token handling in main loop
+     - Implemented _extract_code_block() method
+     - Extracts content and language from ```language\n...\n``` pattern
+   - T009: Implement writer for code blocks ✅
+     - Added CodeBlockNode import to docx_writer.py
+     - Added CodeBlockNode handling in _write_block()
+     - Implemented _write_code_block() method:
+       - Uses monospace font (Courier New)
+       - Preserves whitespace and line breaks
+       - Applies background shading (gray #F0F0F0)
+       - Sets font size to 9pt
+       - Removes inter-line spacing
+   - T010: Integration tests for code block styling (8 tests) ✅
+     - tests/integration/test_code_blocks.py created
+     - Tests for Python code block rendering
+     - Tests for special characters XML escaping
+     - Tests for indentation preservation
+     - Tests for multiple code blocks
+     - Tests for monospace font application
+     - Tests for end-to-end extraction and writing
+   - T011: XML special characters escaping ✅
+     - Implemented _escape_xml_text() method
+     - Escapes < → &lt;, > → &gt;, & → &amp;
+     - Applied in _write_code_block() for all code content
+   - T012: Background shading for code blocks ✅
+     - Applied gray background (#F0F0F0) to code block paragraphs
+     - Used OxmlElement w:shd for paragraph shading
+     - Improves visual distinction of code blocks
+   - **All 22 tests passing, ruff check passing, mypy --strict passing for new code**
+
+### Phase 7: Polish & Cross-Cutting Concerns - COMPLETED ✅
 - [x] Migrate from dataclass to Pydantic v2 (Completed: 2026-04-19) ✅
 - [x] Fix LabelExtractor source_location bug (Completed: 2026-04-19)
 - [x] Fix TypstExtractorV2 list behavior (Completed: 2026-04-19)

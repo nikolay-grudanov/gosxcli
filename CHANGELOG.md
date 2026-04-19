@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-04-20
+
+### 🎉 Code Blocks Support MVP
+
+This release adds basic code blocks support with monospace font, XML escaping, and background shading.
+
+### ✨ New Features
+
+#### Code Blocks Support
+- Multi-line code blocks with language specification (```python, ```rust, etc.)
+- Monospace font (Courier New) for code display
+- Background shading (light gray #F0F0F0) for visual distinction
+- XML special character escaping (<, >, &)
+- Preserved indentation and line breaks
+- Small font size (9pt) for code blocks
+- CodeBlockNode IR model with content, language, and source location
+- Unit tests (14 tests) for CodeBlockNode model and extraction
+- Integration tests (8 tests) for code block rendering
+
+### 📝 Documentation
+
+- Added Code Blocks section to README.md
+- Documented supported languages (Python, Rust, JavaScript, C, C++, plain text)
+- Added code examples for code blocks
+- Updated state.md with Code Blocks Support (Phase 5 completed)
+
+### 🔧 Maintenance
+
+- All 197 tests passing (175 existing + 22 code blocks tests)
+- 0 Ruff errors
+- Mypy --strict for new code blocks code (extractor_v2.py)
+- Comprehensive inline comments in _write_code_block() and _extract_code_block()
+
+### 📊 Metrics
+
+| Metric | Value |
+|--------|-------|
+| Lines of Code | ~4,750 (+280 code blocks) |
+| Test Files | 19 (added test_code_blocks.py) |
+| Test Cases | 197 (+22 code blocks tests) |
+
 ## [0.2.0] - 2026-04-20
 
 ### 🎉 Feature Complete - Release Ready

@@ -26,6 +26,7 @@ from ..ir.model import (
     TOCNode,
     CitationNode,
     BibliographySection,
+    CodeBlockNode,
     NodeType,
     NumberingKind,
     ListKind,
@@ -112,6 +113,10 @@ class TypstExtractorV2:
                 equation = self._extract_equation()
                 if equation:
                     blocks.append(equation)
+            elif token.type == "CODE_BLOCK_DELIM":
+                code_block = self._extract_code_block()
+                if code_block:
+                    blocks.append(code_block)
             elif token.type == "LABEL":
                 self._process_label()
             elif token.type == "CITATION":
@@ -504,6 +509,58 @@ class TypstExtractorV2:
             self.pos += 1
 
         return equation
+
+    def _extract_code_block(self) -> Optional[CodeBlockNode]:
+        """Extract code block from tokens.
+
+        Pattern: ```[language]\ncontent\n```
+
+        Returns:
+            IR CodeBlockNode or None
+        """
+        token = self.tokens[self.pos]
+        delimiter_value = token.value
+
+        # Extract language identifier from delimiter (e.g., "```python")
+        # Pattern: ```language or ```
+        language = None
+        if delimiter_value.startswith("```"):
+            lang_part = delimiter_value[3:].strip()
+            if lang_part:
+                language = lang_part
+
+        # Move past the delimiter token
+        self.pos += 1
+
+        # Collect content until the closing delimiter
+        content_lines = []
+
+        while self.pos < len(self.tokens):
+            current_token = self.tokens[self.pos]
+
+            if current_token.type == "CODE_BLOCK_DELIM":
+                # Found closing delimiter
+                self.pos += 1
+                break
+
+            # Add token value to content
+            content_lines.append(current_token.value)
+            self.pos += 1
+
+        # Join content lines
+        content = "".join(content_lines)
+
+        # Create CodeBlockNode
+        code_block = CodeBlockNode(
+            id=str(uuid.uuid4()),
+            source_location=SourceLocation(
+                file_path=self.file_path, line=token.line, column=token.column
+            ),
+            content=content,
+            language=language,
+        )
+
+        return code_block
 
     def _extract_outline(self) -> Optional[TOCNode]:
         """Extract outline (table of contents) from tokens.
