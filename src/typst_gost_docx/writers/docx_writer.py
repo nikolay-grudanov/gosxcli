@@ -1,8 +1,12 @@
 """DOCX writer for converting IR to Word documents."""
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
+
 from docx import Document
+from docx.document import Document as _Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Inches
 from ..ir.model import (
     Document as IRDocument,
@@ -31,7 +35,7 @@ from ..ir.model import (
     ValidationResult,
 )
 from ..config import MathMode, RefLabels
-from ..parser.validator import ReferenceValidator
+from ..ir.validator import ReferenceValidator
 from .bookmarks import BookmarksManager
 from .styles import StylesManager
 from .images import ImagesManager
@@ -58,7 +62,7 @@ class DocxWriter:
         self.math_mode = math_mode
         self.citation_style = bibliography_style
         self.entry_lookup: dict[str, BibliographyEntry] = {}
-        self.doc = None
+        self.doc: Optional[_Document] = None
         self.bookmarks_manager = BookmarksManager()
         self.styles_manager = StylesManager()
         self.images_manager = ImagesManager()
@@ -77,11 +81,13 @@ class DocxWriter:
             "warnings": 0,
         }
 
-    def write(self, ir_document: IRDocument, output_path: Path) -> dict:
+    def write(self, ir_document: IRDocument, output_path: Path) -> dict[str, Any]:
         if self.reference_doc and self.reference_doc.exists():
             self.doc = Document(str(self.reference_doc))
         else:
             self.doc = Document()
+
+        assert self.doc is not None, "Document not initialized"
 
         self._write_document(ir_document)
 
@@ -89,6 +95,7 @@ class DocxWriter:
         return self.stats
 
     def _write_document(self, ir_doc: IRDocument) -> None:
+        assert self.doc is not None, "Document not initialized"
         for block in ir_doc.blocks:
             self._write_block(block)
 
@@ -115,6 +122,7 @@ class DocxWriter:
             pass
 
     def _write_section(self, section: Section) -> None:
+        assert self.doc is not None, "Document not initialized"
         self.stats["headings"] += 1
 
         # Chapter-aware numbering: increment chapter on level 1 sections
@@ -141,13 +149,14 @@ class DocxWriter:
             self.bookmarks_manager.add_bookmark_if_needed(para, section.label)
 
     def _write_paragraph(self, paragraph: Paragraph) -> None:
+        assert self.doc is not None, "Document not initialized"
         self.stats["paragraphs"] += 1
 
         para = self.doc.add_paragraph(style="Normal")
         self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
-    def _write_inline_nodes(self, para: Any, nodes: list[BaseNode]) -> None:
+    def _write_inline_nodes(self, para: Any, nodes: Sequence[BaseNode]) -> None:
         for node in nodes:
             if isinstance(node, TextRun):
                 para.add_run(node.text)
@@ -176,6 +185,7 @@ class DocxWriter:
                 self._write_inline_nodes(para, node.content)
 
     def _write_list(self, list_block: ListBlock) -> None:
+        assert self.doc is not None, "Document not initialized"
         style = "List Bullet" if list_block.kind == ListKind.BULLET else "List Number"
 
         for item in list_block.items:
@@ -183,6 +193,7 @@ class DocxWriter:
             self.doc.add_paragraph(text, style=style)
 
     def _write_figure(self, figure: Figure) -> None:
+        assert self.doc is not None, "Document not initialized"
         # Check if figure contains a table instead of an image
         if figure.table:
             # Treat table figure as a table (uses table counter)
@@ -248,6 +259,7 @@ class DocxWriter:
         Args:
             equation: IR узел уравнения.
         """
+        assert self.doc is not None, "Document not initialized"
         self.stats["equations"] += 1
 
         # Increment equation counter and store in equation
@@ -262,13 +274,13 @@ class DocxWriter:
             equation.caption.number = equation.number
             equation.caption.chapter_number = equation.chapter_number
 
-        def _render_as_image(latex: str) -> None:
+        def _render_as_image(latex: str, doc: _Document) -> None:
             """Рендерит уравнение как текстовую заглушку (MVP)."""
-            para = self.doc.add_paragraph(style="Normal")
+            para = doc.add_paragraph(style="Normal")
             para.add_run(f"[FORMULA: {latex}]")
             self.stats["warnings"] += 1
 
-        def _render_as_native(latex: str) -> bool:
+        def _render_as_native(latex: str, doc: _Document) -> bool:
             """Рендерит уравнение как OMML.
 
             Returns:
@@ -279,7 +291,7 @@ class DocxWriter:
 
                 omml = converter.convert(latex)
 
-                para = self.doc.add_paragraph(style="Normal")
+                para = doc.add_paragraph(style="Normal")
                 run = para.add_run()
                 run._element.append(omml)
                 return True
@@ -292,15 +304,15 @@ class DocxWriter:
 
         # Логика выбора режима рендеринга
         if self.math_mode == MathMode.IMAGE:
-            _render_as_image(equation.latex)
+            _render_as_image(equation.latex, self.doc)
         elif self.math_mode == MathMode.NATIVE:
-            success = _render_as_native(equation.latex)
+            success = _render_as_native(equation.latex, self.doc)
             if not success:
                 self.stats["warnings"] += 1
         elif self.math_mode == MathMode.FALLBACK:
-            success = _render_as_native(equation.latex)
+            success = _render_as_native(equation.latex, self.doc)
             if not success:
-                _render_as_image(equation.latex)
+                _render_as_image(equation.latex, self.doc)
 
         if equation.caption:
             self._write_caption(equation.caption)
@@ -315,6 +327,7 @@ class DocxWriter:
         Args:
             toc: IR узел оглавления.
         """
+        assert self.doc is not None, "Document not initialized"
         # Add TOC title as Heading 1
         self.doc.add_paragraph(toc.title, style="Heading 1")
 
@@ -346,6 +359,8 @@ class DocxWriter:
         """
         from docx.shared import Cm
         from ..ir.model import CitationStyle
+
+        assert self.doc is not None, "Document not initialized"
 
         # Add bibliography heading
         # Uses Heading 1 style for consistent document structure
@@ -625,8 +640,6 @@ class DocxWriter:
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
         if target:
-            from docx.oxml.shared import OxmlElement, qn
-
             hyperlink = OxmlElement("w:hyperlink")
             hyperlink.set(qn("w:anchor"), ref.target_label)
 
@@ -656,7 +669,7 @@ class DocxWriter:
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
-    def _write_cross_ref_node(self, ref: CrossRefNode, para) -> None:
+    def _write_cross_ref_node(self, ref: CrossRefNode, para: Any) -> None:
         """Записывает CrossRefNode с chapter-aware нумерацией.
 
         Args:
@@ -670,8 +683,6 @@ class DocxWriter:
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
         if target:
-            from docx.oxml.shared import OxmlElement, qn
-
             hyperlink = OxmlElement("w:hyperlink")
             hyperlink.set(qn("w:anchor"), ref.target_label)
 
@@ -789,6 +800,7 @@ class DocxWriter:
         return None
 
     def _write_caption(self, caption: Caption) -> None:
+        assert self.doc is not None, "Document not initialized"
         # Get localized label from config
         label = ""
         if caption.numbering_kind == NumberingKind.FIGURE:
@@ -824,6 +836,7 @@ class DocxWriter:
         Args:
             code_block: IR узел блока кода.
         """
+        assert self.doc is not None, "Document not initialized"
         from docx.shared import Pt
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
@@ -841,7 +854,7 @@ class DocxWriter:
             shading_elm = OxmlElement("w:shd")
             shading_elm.set(qn("w:fill"), "F0F0F0")  # Светло-серый цвет
             para._element.get_or_add_pPr().insert_element_before(
-                shading_elm, "w:spacing" if para._element.pPr is not None else None
+                shading_elm, "w:spacing"
             )
 
             # Экранируем XML спецсимволы и добавляем текст
@@ -851,7 +864,8 @@ class DocxWriter:
             # Применяем моноширинный шрифт
             run.font.name = "Courier New"
             # Устанавливаем шрифт для East Asian characters (для совместимости)
-            run._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
+            if run._element.rPr is not None and run._element.rPr.rFonts is not None:
+                run._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
             run.font.size = Pt(9)  # Мелкий шрифт для кода
 
             # Удаляем интерлиньяж (межстрочный интервал)
@@ -877,7 +891,7 @@ class DocxWriter:
         text = text.replace(">", "&gt;")
         return text
 
-    def _nodes_to_text(self, nodes: list[BaseNode]) -> str:
+    def _nodes_to_text(self, nodes: Sequence[BaseNode]) -> str:
         text_parts = []
         for node in nodes:
             if hasattr(node, "text"):

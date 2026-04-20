@@ -1,6 +1,6 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-04-20 (Code Blocks Support Phase 5 completed)
+**Last Updated:** 2026-04-20 (Full Review & Architecture Fixed)
 **Version:** v0.2.1 (Code Blocks Support)
 **Status:** Release Ready - All tests passing (197/197)
 
@@ -9,7 +9,7 @@
 - Test Files: 19 (added test_code_blocks.py unit + integration)
 - Test Cases: 197 (all passing: 175 existing + 22 code blocks tests)
 - Ruff Errors: 0 (all code)
-- Mypy: Passing (--strict mode enabled for new code blocks code)
+- Mypy: Passing (--strict mode for ALL code, dead code removed)
 
 ---
 
@@ -109,10 +109,10 @@
    - Status: 🟢 Fixed
    - Owner: N/A
 
-8. **No mypy** — Static type checking not configured
-   - Impact: No type safety guarantees
-   - Status: 🟡 Open
-   - Owner: TBD
+ 8. **No mypy** — Static type checking not configured → RESOLVED
+    - Impact: No type safety guarantees
+    - Status: 🟢 Fixed (Solution: mypy --strict passes for all 29 source files, dead code removed)
+    - Completed: 2026-04-20
 
 ---
 
@@ -160,7 +160,25 @@
   - Generated DOCX files open correctly
 
 ### Active Tasks
-- **None** - All Code Blocks Support Phase 5 tasks completed
+- [x] Fixed all 16 mypy --strict errors - Completed: 2026-04-20 ✅
+   - Removed dead code: typst_json_converter.py (unused TypstJsonToIRConverter class)
+   - Fixed bookmarks.py: changed _Paragraph import to Paragraph
+   - Fixed utils/xml.py: added type: ignore[import-untyped] for lxml, added cast() for return type
+   - Fixed ingest/typst_client.py: removed unused type: ignore comments, added cast() for json.loads() return types
+   - All quality checks passing:
+     - mypy --strict: 0 errors (was 16)
+     - ruff check: 0 errors
+     - pytest: 197/197 passing
+   - Updated state.md with fixes and resolved "No mypy" issue
+- [x] Fixed architecture boundary violation - Completed: 2026-04-20 ✅
+   - Issue: Writer layer imported ReferenceValidator from Parser layer (violated 4-layer architecture)
+   - Solution: Moved ReferenceValidator from parser/validator.py to ir/validator.py
+   - Updated imports in docx_writer.py and tests/test_validator.py
+   - All quality checks passing:
+     - mypy --strict: 0 errors
+     - ruff check: 0 errors
+     - pytest: 197/197 passing
+   - 4-layer architecture now fully compliant
 
 ### Recent Work
 - [x] Code Blocks Support Phase 5 (T013-T018) - Completed: 2026-04-20 ✅
@@ -471,6 +489,7 @@
 | 2026-04-19 | Implemented performance benchmarking and E2E structure testing Phase 7 (T098-T108) | Added pytest-benchmark integration, performance thresholds, CLI --benchmark flag, E2E structure tests for DOCX validation, make benchmark and make e2e targets |
 | 2026-04-19 | Completed Phase 7: Polish & Cross-Cutting Concerns (T109-T124) | Updated README.md with v0.2.0 features, updated pyproject.toml to v0.2.0, added inline comments, verified optimization, validated error handling, created v0.1 smoke tests, confirmed DOCX compatibility |
 | 2026-04-20 | Completed Phase 7: Bibliography Polish (T038-T046) | Added bibliography documentation to README.md, updated state.md, added citation key validation with warnings, added placeholder text for incomplete entries, added inline comments to bibliography.py and docx_writer.py, all tests passing (175), ruff and mypy --strict passing, updated CHANGELOG.md |
+| 2026-04-20 | Fixed all 16 mypy --strict errors (16 → 0) | Removed dead code (typst_json_converter.py), fixed import errors (bookmarks.py _Paragraph → Paragraph), added type: ignore for lxml, fixed return types with cast() in typst_client.py, all 197 tests passing, mypy --strict passes for all 29 source files |
 
 ---
 

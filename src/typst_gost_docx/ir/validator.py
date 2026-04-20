@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Sequence
 
-from ..ir.model import (
+from .model import (
     BaseNode,
     Document,
     CrossReference,

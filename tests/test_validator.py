@@ -1,6 +1,6 @@
 """Tests for bidirectional validation of references and labels."""
 
-from typst_gost_docx.parser.validator import ReferenceValidator
+from typst_gost_docx.ir.validator import ReferenceValidator
 from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
 from typst_gost_docx.ir.model import (
     Caption,

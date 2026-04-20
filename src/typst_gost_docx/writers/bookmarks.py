@@ -1,17 +1,19 @@
 """Bookmarks manager for internal references."""
 
 from typing import Optional
+
 from docx.text.paragraph import Paragraph
 
 
 class BookmarksManager:
-    def __init__(self):
-        self.bookmarks = {}
+    def __init__(self) -> None:
+        self.bookmarks: dict[str, Paragraph] = {}
         self._bookmark_id = 0
 
     def add_bookmark_if_needed(self, paragraph: Paragraph, label: Optional[str]) -> None:
         if label:
-            from docx.oxml.shared import OxmlElement, qn
+            from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
 
             self._bookmark_id += 1
 
@@ -27,8 +29,9 @@ class BookmarksManager:
 
             self.bookmarks[label] = paragraph
 
-    def add_hyperlink_to_bookmark(self, para, target_label: str, text: str) -> None:
-        from docx.oxml.shared import OxmlElement, qn
+    def add_hyperlink_to_bookmark(self, para: Paragraph, target_label: str, text: str) -> None:
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         hyperlink = OxmlElement("w:hyperlink")
         hyperlink.set(qn("w:anchor"), target_label)

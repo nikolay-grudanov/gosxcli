@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, cast
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class TypstClient:
     """Client for interacting with Typst compiler via typst-py."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._typst_available = self._check_typst_available()
 
     def _check_typst_available(self) -> bool:
@@ -28,7 +28,7 @@ class TypstClient:
         """Check if typst-py is available."""
         return self._typst_available
 
-    def query_document_structure(self, input_path: Path) -> Optional[Dict[str, Any]]:
+    def query_document_structure(self, input_path: Path) -> Optional[dict[str, object]]:
         """Extract document structure using typst query.
 
         Args:
@@ -41,16 +41,16 @@ class TypstClient:
             return None
 
         try:
-            import typst
+            import typst  # type: ignore[import-not-found]
 
-            result_json = typst.query(
+            result_json: str = typst.query(
                 str(input_path),
                 "<all>",
                 field="value",
                 one=True,
             )
 
-            return json.loads(result_json)
+            return cast(dict[str, object], json.loads(result_json))
         except Exception as e:
             logger.error(f"Error querying document structure: {e}")
             return None
@@ -77,7 +77,7 @@ class TypstClient:
             logger.error(f"Error compiling to PDF: {e}")
             return False
 
-    def query_labels(self, input_path: Path) -> Dict[str, Any]:
+    def query_labels(self, input_path: Path) -> dict[str, object]:
         """Extract all labels from document.
 
         Args:
@@ -92,18 +92,20 @@ class TypstClient:
         try:
             import typst
 
-            result_json = typst.query(str(input_path), "<label>", field="value", one=False)
+            result_json: str | None = typst.query(
+                str(input_path), "<label>", field="value", one=False
+            )
 
             if result_json:
-                labels_data = json.loads(result_json)
-                return {label.get("label", ""): label for label in labels_data}
+                labels_data = cast(list[dict[str, object]], json.loads(result_json))
+                return {cast(str, label.get("label", "")): label for label in labels_data}
 
             return {}
         except Exception as e:
             logger.error(f"Error querying labels: {e}")
             return {}
 
-    def query_heading(self, input_path: Path) -> Optional[Dict[str, Any]]:
+    def query_heading(self, input_path: Path) -> Optional[dict[str, object]]:
         """Extract heading structure.
 
         Args:
@@ -118,7 +120,7 @@ class TypstClient:
         try:
             import typst
 
-            result_json = typst.query(
+            result_json: str | None = typst.query(
                 str(input_path),
                 "heading",
                 field="value",
@@ -126,7 +128,7 @@ class TypstClient:
             )
 
             if result_json:
-                return json.loads(result_json)
+                return cast(dict[str, object], json.loads(result_json))
 
             return None
         except Exception as e:

@@ -35,6 +35,7 @@ dev = [
     "pytest-benchmark>=4.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "lxml-stubs>=0.5.1",
 ]
 math = [
     "latex2mathml>=3.76.0",

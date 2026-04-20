@@ -1,16 +1,17 @@
 """Images manager for handling image insertion."""
 
 from pathlib import Path
-from docx import Document
-from docx.shared import Inches
 from typing import Optional
+
+from docx.document import Document as _Document
+from docx.shared import Inches
 
 
 class ImagesManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.image_counter = 0
 
-    def add_image(self, doc: Document, image_path: str, width: Optional[Inches] = None) -> None:
+    def add_image(self, doc: _Document, image_path: str, width: Optional[Inches] = None) -> None:
         self.image_counter += 1
 
         path = Path(image_path)

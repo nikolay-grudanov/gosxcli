@@ -2,6 +2,8 @@
 
 import re
 import uuid
+from typing import Sequence
+
 from ..ir.model import (
     BaseNode,
     CrossRefMap,
@@ -12,12 +14,12 @@ from ..ir.model import (
 
 
 class LabelExtractor:
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str) -> None:
         self.file_path = file_path
         self.cross_ref_map = CrossRefMap()
 
-    def extract_labels_and_refs(self, text: str) -> list[BaseNode]:
-        nodes = []
+    def extract_labels_and_refs(self, text: str) -> Sequence[BaseNode]:
+        nodes: list[BaseNode] = []
 
         label_pattern = r"<([\w:_-]+)>"
         ref_pattern = r"@([\w:]+)"

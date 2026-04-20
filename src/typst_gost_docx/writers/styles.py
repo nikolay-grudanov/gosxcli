@@ -2,7 +2,7 @@
 
 
 class StylesManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.style_mappings = {
             "Heading 1": "Heading 1",
             "Heading 2": "Heading 2",
