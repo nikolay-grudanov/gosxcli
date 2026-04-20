@@ -1,7 +1,7 @@
 ---
 name: gosxcli-orchestrator
 mode: primary
-model: minimax/MiniMax-M2.7
+model: minimax-coding-plan/MiniMax-M2.7
 description: GOSXCLI Orchestrator — главный агент управления для Typst GOST DOCX Converter
 temperature: 0.3
 tools:
