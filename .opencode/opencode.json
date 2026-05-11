@@ -4,19 +4,19 @@
   "default_agent": "gosxcli-orchestrator",
   "agent": {
     "gosxcli-orchestrator": {
-      "model": "minimax/MiniMax-M2.7"
+      "model": "minimax-coding-plan/MiniMax-M2.7"
     },
     "gosxcli-researcher": {
       "model": "zai-coding-plan/glm-4.7",
-      "hidden": true
+      "hidden": false
     },
     "gosxcli-developer": {
-      "model": "minimax/MiniMax-M2.5",
-      "hidden": true
+      "model": "minimax-coding-plan/MiniMax-M2.5",
+      "hidden": false
     },
     "gosxcli-reviewer": {
       "model": "zai-coding-plan/glm-4.7",
-      "hidden": true
+      "hidden": false
     }
   }
 }

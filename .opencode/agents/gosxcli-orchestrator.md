@@ -1,11 +1,11 @@
 ---
 name: gosxcli-orchestrator
 mode: primary
-model: minimax-coding-plan/MiniMax-M2.7
 description: GOSXCLI Orchestrator — главный агент управления для Typst GOST DOCX Converter
 temperature: 0.3
 tools:
   "*": false
+  "compress*": true
   read: true
   write: true
   edit: true
@@ -14,10 +14,11 @@ tools:
 permission:
   edit: ask
   bash: ask
+  compress: allow
   task:
-    "gosxcli-*": "allow"
-    "build": "deny"
-    "plan": "deny"
+    "gosxcli-*": allow
+    "build": deny
+    "plan": deny
 color: "#4ade80"
 ---
 

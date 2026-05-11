@@ -2,7 +2,6 @@
 name: gosxcli-reviewer
 description: Reviews GOSXCLI code for quality, architecture compliance, and GOST standards. Spec-driven review
 mode: subagent
-model: minimax-coding-plan/MiniMax-M2.5
 temperature: 0.2
 tools:
   "*": false

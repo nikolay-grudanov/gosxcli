@@ -2,7 +2,7 @@
 
 Typst to DOCX converter for academic documents with GOST styling support.
 
-## Status: v0.2.0 (Feature Complete)
+## Status: v0.2.1 (Code Blocks Support)
 
 Production-ready tool for converting Typst academic documents (especially those using `@preview/modern-g7-32`) to editable DOCX files while preserving structure, references, tables, images, and applying GOST-compliant styling.
 

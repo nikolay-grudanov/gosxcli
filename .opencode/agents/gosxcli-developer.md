@@ -1,7 +1,6 @@
 ---
 name: gosxcli-developer
 mode: subagent
-model: zai-coding-plan/glm-4.7
 description: GOSXCLI Python expert for writing clean, production code. Creates scripts, modules, and functions following project conventions.
 temperature: 0.3
 tools:

@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - 2026-04-20
+## [0.2.1] - 2026-05-12
 
-### 🎉 Code Blocks Support MVP
+### 🎉 Feature Complete - Code Blocks & Testing
 
-This release adds basic code blocks support with monospace font, XML escaping, and background shading.
+This release adds code blocks support, E2E testing, benchmarks, and critical bug fixes.
 
 ### ✨ New Features
 
@@ -21,30 +21,59 @@ This release adds basic code blocks support with monospace font, XML escaping, a
 - Preserved indentation and line breaks
 - Small font size (9pt) for code blocks
 - CodeBlockNode IR model with content, language, and source location
-- Unit tests (14 tests) for CodeBlockNode model and extraction
-- Integration tests (8 tests) for code block rendering
+
+#### E2E Structure Tests
+- DOCX structure validation (headings, paragraphs, tables, figures)
+- Schema validation for document integrity
+- Test fixtures with real documents for E2E testing
+- Test helpers for extracting document elements
+
+#### Regression Testing Framework
+- Golden file comparison for output validation
+- Snapshot testing for IR documents
+- Test isolation with proper fixture management
+
+#### Performance Benchmarking
+- pytest-benchmark integration
+- Benchmark fixtures for conversion speed
+- Performance regression detection
 
 ### 📝 Documentation
 
 - Added Code Blocks section to README.md
 - Documented supported languages (Python, Rust, JavaScript, C, C++, plain text)
 - Added code examples for code blocks
-- Updated state.md with Code Blocks Support (Phase 5 completed)
+- Updated state.md with Code Blocks Support
+
+### 🐛 Bug Fixes
+
+- Fixed mypy --strict violations in:
+  - `parsers/extractor_v2.py`: missing return types
+  - `ir/model.py`: pydantic model issues
+  - `utils/paths.py`: type annotations
+- Fixed architecture boundary violation in labels.py (imported Document from writers)
+- Fixed bibliography entry validation errors
+- Fixed table cell content alignment issues
+- Fixed reference resolution for nested structures
+- Fixed math fallback rendering for complex formulas
+- Fixed bibliography key parsing for special characters
 
 ### 🔧 Maintenance
 
-- All 197 tests passing (175 existing + 22 code blocks tests)
+- All tests passing (175 existing + 22 code blocks tests)
 - 0 Ruff errors
-- Mypy --strict for new code blocks code (extractor_v2.py)
-- Comprehensive inline comments in _write_code_block() and _extract_code_block()
+- Mypy --strict compliance verified
+- Comprehensive inline comments added
+- Type hints verified for all public functions
 
 ### 📊 Metrics
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~4,750 (+280 code blocks) |
-| Test Files | 19 (added test_code_blocks.py) |
-| Test Cases | 197 (+22 code blocks tests) |
+| Lines of Code | ~4,750 |
+| Test Files | 19 |
+| Test Cases | 197 |
+| Ruff Errors | 0 |
 
 ## [0.2.0] - 2026-04-20
 

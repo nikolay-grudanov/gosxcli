@@ -1,8 +1,8 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-04-20 (Full Review & Architecture Fixed)
+**Last Updated:** 2026-05-12 (v0.2.1 Released)
 **Version:** v0.2.1 (Code Blocks Support)
-**Status:** Release Ready - All tests passing (197/197)
+**Status:** Released - git tag v0.2.1 created
 
 ### Key Metrics
 - Lines of Code: ~4,750 (+280 code blocks support with documentation)
