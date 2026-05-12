@@ -2,7 +2,7 @@
 
 Typst to DOCX converter for academic documents with GOST styling support.
 
-## Status: v0.2.1 (Code Blocks Support)
+## Status: v0.3.0 (Syntax Highlighting)
 
 Production-ready tool for converting Typst academic documents (especially those using `@preview/modern-g7-32`) to editable DOCX files while preserving structure, references, tables, images, and applying GOST-compliant styling.
 
@@ -21,6 +21,9 @@ Production-ready tool for converting Typst academic documents (especially those 
 - ✅ Custom DOCX templates
 - ✅ Bidirectional reference validation
 - ✅ IR dump for debugging
+- ✅ Code blocks with syntax highlighting (Pygments)
+- ✅ Bibliography support
+- ✅ Syntax highlighting (VS Code Dark+)
 
 ## Installation
 
@@ -232,8 +235,35 @@ typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib 
 - JavaScript: ```javascript
 - C: ```c
 - C++: ```cpp
+- Go: ```go
 - Plain text: ``` (no language specified)
 - Any custom identifier: ```yourlanguage
+
+### Syntax Highlighting
+
+**Pygments-based syntax highlighting** with VS Code Dark+ color scheme:
+
+| Token Type | Color | Example |
+|-----------|-------|--------|
+| Keywords | #569CD6 (blue) | `def`, `class`, `if`, `return` |
+| Strings | #CE9178 (orange) | `"Hello"`, `'World'` |
+| Comments | #6A9955 (green) | `// comment`, `# comment` |
+| Numbers | #B5CEA8 (light green) | `42`, `3.14` |
+| Functions | #DCDCAA (yellow) | `print()`, `main()` |
+| Operators | #D4D4D4 (white) | `+`, `-`, `*`, `/` |
+| Text | #D4D4D4 (white) | Regular code text |
+
+**Features:**
+- Dark background (#1E1E1E) for code blocks
+- Syntax highlighting for supported languages
+- Fallback to plain text for unsupported languages
+- Preserved indentation and formatting
+
+**CLI usage:**
+```bash
+# Syntax highlighting is automatic for supported languages
+typst-gost-docx convert thesis.typ -o thesis.docx
+```
 
 ## Architecture
 
@@ -347,12 +377,13 @@ See `docs/roadmap.md` for future plans.
 - ✅ Performance benchmarking
 - ✅ Nested tables support
 
-### v0.3 (Planned)
-- Code blocks with syntax highlighting
-- Bibliography support
-- Page breaks and section formatting
-- More robust error handling
-- Full GOST 7.32-2017 compliance
+### v0.3 (Completed ✅)
+- ✅ Code blocks with syntax highlighting
+- ✅ Syntax highlighting with Pygments (VS Code Dark+)
+- ✅ Bibliography support
+- ✅ Page breaks and section formatting
+- ✅ More robust error handling
+- ✅ Full GOST 7.32-2017 compliance
 
 ## Limitations
 

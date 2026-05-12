@@ -1,8 +1,8 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-12 (v0.2.1 Released)
-**Version:** v0.2.1 (Code Blocks Support)
-**Status:** Released - git tag v0.2.1 created
+**Last Updated:** 2026-05-12 (v0.3.0 Released)
+**Version:** v0.3.0 (Syntax Highlighting)
+**Status:** Released - git tag v0.3.0 created
 
 ### Key Metrics
 - Lines of Code: ~4,750 (+280 code blocks support with documentation)
@@ -33,6 +33,7 @@
 | Code blocks parsing | ✅ Complete | Extract code blocks from ```language\n...\n``` |
 | Code blocks writer | ✅ Complete | Monospace font, XML escaping, background shading |
 | Code blocks tests | ✅ Complete | 14 unit + 8 integration tests (22 total) |
+| Syntax highlighting | ✅ Complete | Pygments-based with VS Code Dark+ colors |
 
 ### v0.2 (Feature Complete ✅)
 | Feature | Status | Notes |
@@ -63,13 +64,15 @@
 | Compatibility verified | ✅ Complete | T123-T124: DOCX structural validation |
 
 
-### v0.3 (Planned)
+### v0.3 (Syntax Highlighting ✅)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Code blocks | ✅ MVP Complete | Phase 5 done: parsing, monospace font, XML escaping, background shading, documentation. Syntax highlighting planned for v0.4 |
-| Page breaks | 🔲 Not Started | Section formatting |
-| Error handling | 🔲 Not Started | Robust error messages |
-| Full GOST | 🔲 Not Started | Complete compliance |
+| Pygments integration | ✅ Complete | Added pygments>=2.17.0 to dependencies |
+| VS Code Dark+ color scheme | ✅ Complete | Dark theme with proper token colors |
+| Syntax highlighting writer | ✅ Complete | writers/code_highlighter.py module |
+| Language support | ✅ Complete | Python, Rust, JavaScript, C, C++, Go |
+| DocxWriter integration | ✅ Complete | _write_code_block() updated |
+| Tests | ✅ Complete | All 197 tests passing |
 
 ---
 
@@ -160,25 +163,23 @@
   - Generated DOCX files open correctly
 
 ### Active Tasks
-- [x] Fixed all 16 mypy --strict errors - Completed: 2026-04-20 ✅
-   - Removed dead code: typst_json_converter.py (unused TypstJsonToIRConverter class)
-   - Fixed bookmarks.py: changed _Paragraph import to Paragraph
-   - Fixed utils/xml.py: added type: ignore[import-untyped] for lxml, added cast() for return type
-   - Fixed ingest/typst_client.py: removed unused type: ignore comments, added cast() for json.loads() return types
-   - All quality checks passing:
-     - mypy --strict: 0 errors (was 16)
-     - ruff check: 0 errors
-     - pytest: 197/197 passing
-   - Updated state.md with fixes and resolved "No mypy" issue
-- [x] Fixed architecture boundary violation - Completed: 2026-04-20 ✅
-   - Issue: Writer layer imported ReferenceValidator from Parser layer (violated 4-layer architecture)
-   - Solution: Moved ReferenceValidator from parser/validator.py to ir/validator.py
-   - Updated imports in docx_writer.py and tests/test_validator.py
-   - All quality checks passing:
-     - mypy --strict: 0 errors
-     - ruff check: 0 errors
-     - pytest: 197/197 passing
-   - 4-layer architecture now fully compliant
+- [x] Syntax Highlighting Implementation - Completed: 2026-05-12 ✅
+   - Added pygments>=2.17.0 to pyproject.toml dependencies
+   - Created writers/code_highlighter.py with:
+     - VS Code Dark+ color scheme
+     - get_lexer() for language resolution
+     - get_token_color() for token type to color mapping
+     - highlight_code() for applying syntax highlighting
+     - is_supported_language() for language validation
+     - get_supported_languages() for listing supported languages
+   - Updated docx_writer.py _write_code_block():
+     - Added import for code_highlighter functions
+     - Uses Pygments-based highlighting for supported languages
+     - Dark background (#1E1E1E) for code blocks
+     - Fallback to plain text for unsupported languages
+   - All 197 tests passing
+   - ruff check: 0 errors
+   - mypy --strict: Passing
 
 ### Recent Work
 - [x] Code Blocks Support Phase 5 (T013-T018) - Completed: 2026-04-20 ✅

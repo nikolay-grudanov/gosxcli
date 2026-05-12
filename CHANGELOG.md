@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-12
+
+### ✨ Syntax Highlighting
+
+- Pygments-based syntax highlighting for code blocks
+- VS Code Dark+ color scheme
+- Support for Python, Rust, JavaScript, C, C++, Go
+- Colored keywords, strings, comments, numbers, functions
+- Dark background (#1E1E1E) for code blocks
+- Monospace font (Courier New, 9pt)
+
 ## [0.2.1] - 2026-05-12
 
 ### 🎉 Feature Complete - Code Blocks & Testing

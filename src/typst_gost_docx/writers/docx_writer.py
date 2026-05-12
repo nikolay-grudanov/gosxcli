@@ -40,6 +40,7 @@ from .bookmarks import BookmarksManager
 from .styles import StylesManager
 from .images import ImagesManager
 from .tables import TablesManager
+from .code_highlighter import highlight_code, is_supported_language
 
 
 class DocxWriter:
@@ -831,47 +832,57 @@ class DocxWriter:
         """Записывает блок кода в документ.
 
         Использует моноширинный шрифт (Courier New/Consolas) для отображения кода.
+        Применяет синтаксическое подсвечивание через Pygments, если язык определён.
         Сохраняет отступы и переносы строк. Экранирует XML спецсимволы.
 
         Args:
             code_block: IR узел блока кода.
         """
-        assert self.doc is not None, "Document not initialized"
-        from docx.shared import Pt
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.shared import Pt, RGBColor
 
-        # Разбиваем содержимое на строки
+        assert self.doc is not None, "Document not initialized"
+
+        # Determine if we should apply syntax highlighting
+        language = code_block.language or "plain"
+        apply_highlighting = is_supported_language(language)
+
+        # Background color for code blocks
+        bg_color = RGBColor(0x1E, 0x1E, 0x1E)  # Dark gray (VS Code dark)
+
+        # Process code line by line to preserve formatting
         lines = code_block.content.split("\n")
 
-        # Применяем фоновое затенение к каждому параграфу кода
         for line in lines:
-            # Создаем параграф для каждой строки кода
+            # Create paragraph for each code line
             para = self.doc.add_paragraph(style="Normal")
 
-            # Применяем фоновое затенение (серый цвет)
-            # Добавляем shading через OxmlElement
+            # Apply dark background shading
             shading_elm = OxmlElement("w:shd")
-            shading_elm.set(qn("w:fill"), "F0F0F0")  # Светло-серый цвет
+            shading_elm.set(qn("w:fill"), "1E1E1E")
             para._element.get_or_add_pPr().insert_element_before(
                 shading_elm, "w:spacing"
             )
 
-            # Экранируем XML спецсимволы и добавляем текст
+            # Escape XML special characters
             escaped_line = self._escape_xml_text(line)
-            run = para.add_run(escaped_line)
 
-            # Применяем моноширинный шрифт
-            run.font.name = "Courier New"
-            # Устанавливаем шрифт для East Asian characters (для совместимости)
-            if run._element.rPr is not None and run._element.rPr.rFonts is not None:
-                run._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
-            run.font.size = Pt(9)  # Мелкий шрифт для кода
+            # Apply syntax highlighting or simple monospace
+            if apply_highlighting:
+                highlight_code(escaped_line, language, para, bg_color)
+            else:
+                # Simple monospace without highlighting
+                run = para.add_run(escaped_line)
+                run.font.name = "Courier New"
+                run.font.size = Pt(9)
+                # Light gray for plain text
+                run.font.color.rgb = RGBColor(0xD4, 0xD4, 0xD4)
 
-            # Удаляем интерлиньяж (межстрочный интервал)
+            # Remove interline spacing
             para.paragraph_format.space_before = Pt(0)
             para.paragraph_format.space_after = Pt(0)
-            para.paragraph_format.line_spacing = 1.0  # Одиночный интервал
+            para.paragraph_format.line_spacing = 1.0
 
     def _escape_xml_text(self, text: str) -> str:
         """Экранирует XML спецсимволы для безопасного использования в DOCX.
