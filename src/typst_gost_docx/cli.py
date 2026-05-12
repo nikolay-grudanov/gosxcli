@@ -40,7 +40,9 @@ def convert(
         MathMode.FALLBACK, "--math-mode", help="Math rendering mode"
     ),
     bibliography_style: CitationStyle = typer.Option(
-        CitationStyle.NUMERIC, "--bibliography-style", help="Citation style (numeric or author-year)"
+        CitationStyle.NUMERIC,
+        "--bibliography-style",
+        help="Citation style (numeric or author-year)",
     ),
     log_level: str = typer.Option("INFO", "--log-level", help="Log level"),
     benchmark: bool = typer.Option(False, "--benchmark", help="Enable benchmark mode"),

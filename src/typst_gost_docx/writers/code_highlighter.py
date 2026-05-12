@@ -11,6 +11,7 @@ Typical usage:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from docx.shared import Pt, RGBColor
@@ -80,6 +81,8 @@ def get_lexer(language: str) -> Lexer:
     try:
         return get_lexer_by_name(lang)
     except Exception:  # noqa: BLE001
+        logger = logging.getLogger("typst_gost_docx")
+        logger.debug(f"Failed to get lexer for '{lang}', falling back to text")
         return get_lexer_by_name("text")
 
 
@@ -174,9 +177,7 @@ def highlight_code(
         # Convert RGBColor to hex string using str() method
         color_hex = str(shading_color)
         shading_elm.set(qn("w:fill"), color_hex)
-        paragraph._element.get_or_add_pPr().insert_element_before(
-            shading_elm, "w:spacing"
-        )
+        paragraph._element.get_or_add_pPr().insert_element_before(shading_elm, "w:spacing")
 
 
 def is_supported_language(language: str) -> bool:

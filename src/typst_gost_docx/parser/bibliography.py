@@ -53,9 +53,7 @@ class BibliographyFile:
             entry: BibliographyEntry to add.
         """
         if entry.key in self.entries:
-            self.parse_errors.append(
-                f"Duplicate key '{entry.key}' - using first occurrence"
-            )
+            self.parse_errors.append(f"Duplicate key '{entry.key}' - using first occurrence")
             return  # Keep first occurrence, skip duplicates
         self.entries[entry.key] = entry
 
@@ -103,11 +101,11 @@ def _strip_latex_commands(text: str) -> str:
     Это позволяет корректно отображать библиографические записи в DOCX без LaTeX-синтаксиса.
 
     Обрабатываемые команды:
-    - \textbf{...} - жирный шрифт
-    - \textit{...} - курсив
-    - \emph{...} - акцент
-    - \textsc{...} - капитель
-    - Общие команды вида \command{content}
+    - \\textbf{...} - жирный шрифт
+    - \\textit{...} - курсив
+    - \\emph{...} - акцент
+    - \\textsc{...} - капитель
+    - Общие команды вида \\command{content}
 
     Args:
         text: Text potentially containing LaTeX commands.
@@ -117,21 +115,21 @@ def _strip_latex_commands(text: str) -> str:
     """
     # Remove specific text formatting commands (preserve content inside braces)
     # Pattern: \\text*{content} → content
-    text = re.sub(r'\\text\w+\{([^}]*)\}', r'\1', text)
-    text = re.sub(r'\\textbf\{([^}]*)\}', r'\1', text)
-    text = re.sub(r'\\textit\{([^}]*)\}', r'\1', text)
-    text = re.sub(r'\\emph\{([^}]*)\}', r'\1', text)
+    text = re.sub(r"\\text\w+\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\textbf\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\textit\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\emph\{([^}]*)\}", r"\1", text)
 
     # Remove general LaTeX commands with braces
     # Pattern: \\command{content} → content
-    text = re.sub(r'\\\w+\{([^}]*)\}', r'\1', text)
+    text = re.sub(r"\\\w+\{([^}]*)\}", r"\1", text)
 
     # Remove LaTeX commands without braces (e.g., \& \% etc.)
     # Pattern: \\command → empty string
-    text = re.sub(r'\\[a-zA-Z]+', '', text)
+    text = re.sub(r"\\[a-zA-Z]+", "", text)
 
     # Clean up extra whitespace (multiple spaces → single space)
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r"\s+", " ", text)
 
     # Strip leading/trailing whitespace
     return text.strip()
@@ -154,26 +152,27 @@ def _parse_bibtex_value(value: str) -> str:
     """
     # Remove surrounding braces {...} or quotes "..."
     value = value.strip()
-    if (value.startswith('{') and value.endswith('}')) or \
-       (value.startswith('"') and value.endswith('"')):
+    if (value.startswith("{") and value.endswith("}")) or (
+        value.startswith('"') and value.endswith('"')
+    ):
         value = value[1:-1]
 
     # Unescape common BibTeX special characters
     # In BibTeX, these characters are escaped with backslash
-    value = value.replace('\\&', '&')
-    value = value.replace('\\#', '#')
-    value = value.replace('\\%', '%')
-    value = value.replace('\\$', '$')
-    value = value.replace('\\{', '{')
-    value = value.replace('\\}', '}')
+    value = value.replace("\\&", "&")
+    value = value.replace("\\#", "#")
+    value = value.replace("\\%", "%")
+    value = value.replace("\\$", "$")
+    value = value.replace("\\{", "{")
+    value = value.replace("\\}", "}")
     # Tilde is non-breaking space in LaTeX, replace with regular space
-    value = value.replace('~', ' ')
+    value = value.replace("~", " ")
     # Double dash in LaTeX is en dash (–) for page ranges
-    value = value.replace('--', '–')
+    value = value.replace("--", "–")
 
     # Remove LaTeX accent commands (e.g., \`a → a, \"o → o, ^e → e)
     # Pattern: \\[accent]letter → letter
-    value = re.sub(r'\\["\'`^~=.uvHtcdb](\w)', r'\1', value)
+    value = re.sub(r'\\["\'`^~=.uvHtcdb](\w)', r"\1", value)
 
     # Strip LaTeX formatting commands (e.g., \textbf, \textit)
     value = _strip_latex_commands(value)
@@ -191,14 +190,11 @@ class BibTeXParser:
     """
 
     # Regex patterns for parsing BibTeX
-    ENTRY_PATTERN = re.compile(
-        r'@(\w+)\s*\{\s*([^,\s]+)\s*,',
-        re.IGNORECASE | re.MULTILINE
-    )
+    ENTRY_PATTERN = re.compile(r"@(\w+)\s*\{\s*([^,\s]+)\s*,", re.IGNORECASE | re.MULTILINE)
     FIELD_PATTERN = re.compile(
-        r'(\w+)\s*=\s*'
+        r"(\w+)\s*=\s*"
         r'(?:\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}|"([^"]*)"|([^\s,]+))',
-        re.MULTILINE | re.DOTALL
+        re.MULTILINE | re.DOTALL,
     )
 
     def __init__(self) -> None:
@@ -225,18 +221,20 @@ class BibTeXParser:
         # Step 1: Remove comments (lines starting with % or %%)
         # BibTeX comments start with % (single or double percent sign)
         lines: list[str] = []
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             # Remove inline comments (comment after text on same line)
-            if '%' in line:
-                comment_pos = line.index('%')
+            if "%" in line:
+                comment_pos = line.index("%")
                 # Check if it's a LaTeX comment (not a percent in a string)
                 # In BibTeX, % inside braces is not a comment
-                if comment_pos == 0 or line[:comment_pos].count('{') == line[:comment_pos].count('}'):
+                if comment_pos == 0 or line[:comment_pos].count("{") == line[:comment_pos].count(
+                    "}"
+                ):
                     line = line[:comment_pos]
             line = line.rstrip()
-            if line and not line.startswith('%%'):
+            if line and not line.startswith("%%"):
                 lines.append(line)
-        content = '\n'.join(lines)
+        content = "\n".join(lines)
 
         # Initialize result object
         bibliography = BibliographyFile("")
@@ -255,9 +253,9 @@ class BibTeXParser:
             brace_count = 1
             end = start
             for i, char in enumerate(content[start:], start):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
                         end = i
@@ -271,32 +269,32 @@ class BibTeXParser:
             for field_match in self.FIELD_PATTERN.finditer(entry_body):
                 field_name = field_match.group(1).lower()
                 # Get value from whichever group matched (braces, quotes, or plain text)
-                field_value = field_match.group(2) or field_match.group(3) or field_match.group(4) or ""
+                field_value = (
+                    field_match.group(2) or field_match.group(3) or field_match.group(4) or ""
+                )
                 fields[field_name] = _parse_bibtex_value(field_value)
 
             # Step 5: Create BibliographyEntry
             entry = BibliographyEntry(
                 key=key,
                 entry_type=_parse_entry_type(entry_type_str),
-                author=fields.get('author', ''),
-                title=fields.get('title', ''),
-                year=fields.get('year', ''),
-                journal=fields.get('journal', ''),
-                booktitle=fields.get('booktitle', ''),
-                publisher=fields.get('publisher', ''),
-                address=fields.get('address', ''),
-                pages=fields.get('pages', ''),
-                volume=fields.get('volume', ''),
-                number=fields.get('number', ''),
-                doi=fields.get('doi', ''),
-                url=fields.get('url', ''),
+                author=fields.get("author", ""),
+                title=fields.get("title", ""),
+                year=fields.get("year", ""),
+                journal=fields.get("journal", ""),
+                booktitle=fields.get("booktitle", ""),
+                publisher=fields.get("publisher", ""),
+                address=fields.get("address", ""),
+                pages=fields.get("pages", ""),
+                volume=fields.get("volume", ""),
+                number=fields.get("number", ""),
+                doi=fields.get("doi", ""),
+                url=fields.get("url", ""),
             )
 
             # Validate required fields (at least author or title should be present)
             if not entry.author and not entry.title:
-                self.errors.append(
-                    f"Entry '{key}' is missing both author and title"
-                )
+                self.errors.append(f"Entry '{key}' is missing both author and title")
 
             # Add entry to results
             self.entries.append(entry)

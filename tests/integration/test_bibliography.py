@@ -139,7 +139,6 @@ class TestInlineCitationExtraction:
         citation_pattern = r"@\[([\w]+)\]"
         matches = re.findall(citation_pattern, content)
 
-        expected_keys = ["petrov2023", "sidorov2022", "ivanov2021"]
         assert len(matches) >= 3, f"Expected at least 3 citations, found {len(matches)}"
 
         # Check unique keys

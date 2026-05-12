@@ -7,7 +7,7 @@ for converting Typst documents to DOCX format.
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class NodeType(str, Enum):
@@ -137,7 +137,7 @@ class Paragraph(BaseNode):
 
     node_type: NodeType = NodeType.PARAGRAPH
     runs: list["InlineNode"] = Field(default_factory=list)
-    _content: str = ""
+    _content: str = PrivateAttr(default="")
 
     @property
     def content(self) -> str:

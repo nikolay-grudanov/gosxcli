@@ -1,5 +1,6 @@
 """Images manager for handling image insertion."""
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +17,7 @@ class ImagesManager:
 
         path = Path(image_path)
         if not path.exists():
+            logging.getLogger("typst_gost_docx").warning(f"Image not found: {image_path}")
             return
 
         if width is None:

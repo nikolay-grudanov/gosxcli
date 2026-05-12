@@ -8,6 +8,7 @@ from docx.document import Document as _Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches
+from docx.text.paragraph import Paragraph as DocxParagraph
 from ..ir.model import (
     Document as IRDocument,
     BaseNode,
@@ -36,8 +37,8 @@ from ..ir.model import (
 )
 from ..config import MathMode, RefLabels
 from ..ir.validator import ReferenceValidator
+from ..utils.ref_utils import infer_ref_kind
 from .bookmarks import BookmarksManager
-from .styles import StylesManager
 from .images import ImagesManager
 from .tables import TablesManager
 from .code_highlighter import highlight_code, is_supported_language
@@ -65,7 +66,6 @@ class DocxWriter:
         self.entry_lookup: dict[str, BibliographyEntry] = {}
         self.doc: Optional[_Document] = None
         self.bookmarks_manager = BookmarksManager()
-        self.styles_manager = StylesManager()
         self.images_manager = ImagesManager()
         self.tables_manager = TablesManager()
         self.chapter_context = ChapterContext()
@@ -94,6 +94,17 @@ class DocxWriter:
 
         self.doc.save(str(output_path))
         return self.stats
+
+    def _infer_ref_kind(self, label: str) -> Optional[str]:
+        """Инферирует тип ссылки по префиксу метки.
+
+        Args:
+            label: Метка ссылки (например, fig:results).
+
+        Returns:
+            Тип ссылки (fig, tbl, eq) или None.
+        """
+        return infer_ref_kind(label)
 
     def _write_document(self, ir_doc: IRDocument) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -157,7 +168,7 @@ class DocxWriter:
         self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
-    def _write_inline_nodes(self, para: Any, nodes: Sequence[BaseNode]) -> None:
+    def _write_inline_nodes(self, para: DocxParagraph, nodes: Sequence[BaseNode]) -> None:
         for node in nodes:
             if isinstance(node, TextRun):
                 para.add_run(node.text)
@@ -377,9 +388,7 @@ class DocxWriter:
         # Write each bibliography entry with hanging indent
         for i, entry in enumerate(entries, start=1):
             # Format entry text based on citation style
-            entry_text = self._format_bibliography_entry(
-                entry, i, bib_section.style
-            )
+            entry_text = self._format_bibliography_entry(entry, i, bib_section.style)
             para = self.doc.add_paragraph(style="Normal")
 
             # Apply hanging indent (1.25cm as per ГОСТ 7.32-2017)
@@ -637,7 +646,7 @@ class DocxWriter:
         # Join parts with single space (author-year style uses space separator)
         return " ".join(parts)
 
-    def _write_cross_reference(self, ref: CrossReference, para: Any) -> None:
+    def _write_cross_reference(self, ref: CrossReference, para: DocxParagraph) -> None:
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
         if target:
@@ -670,7 +679,7 @@ class DocxWriter:
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
-    def _write_cross_ref_node(self, ref: CrossRefNode, para: Any) -> None:
+    def _write_cross_ref_node(self, ref: CrossRefNode, para: DocxParagraph) -> None:
         """Записывает CrossRefNode с chapter-aware нумерацией.
 
         Args:
@@ -713,7 +722,7 @@ class DocxWriter:
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
-    def _write_citation(self, citation: CitationNode, para: Any) -> None:
+    def _write_citation(self, citation: CitationNode, para: DocxParagraph) -> None:
         """Записывает inline citation marker.
 
         Supports both NUMERIC and AUTHOR_YEAR citation styles:
@@ -731,7 +740,7 @@ class DocxWriter:
             entry = self.entry_lookup.get(citation.key)
             if entry and entry.author and entry.year:
                 # Extract last name (first word before comma or first word)
-                author_last = entry.author.split(',')[0].split()[0] if entry.author else ""
+                author_last = entry.author.split(",")[0].split()[0] if entry.author else ""
                 citation_text = f"({author_last}, {entry.year})"
             else:
                 # Fallback to numeric if no author/year
@@ -754,7 +763,7 @@ class DocxWriter:
         """
         # Determine ref kind from target label prefix if not set
         if not ref.ref_kind:
-            ref.ref_kind = self._infer_ref_kind(ref.target_label)
+            ref.ref_kind = infer_ref_kind(ref.target_label)
 
         # Get localized label from config
         label = ""
@@ -780,25 +789,6 @@ class DocxWriter:
             formatted = f"{ref.chapter_number}.{ref.number}"
 
         return formatted
-
-    def _infer_ref_kind(self, label: str) -> Optional[str]:
-        """Определяет тип ссылки по префиксу метки.
-
-        Args:
-            label: Метка ссылки (например, "fig:results", "tbl:data").
-
-        Returns:
-            Тип ссылки ("fig", "tbl", "eq", "ch") или None если не удалось определить.
-        """
-        if label.startswith("fig:"):
-            return "fig"
-        elif label.startswith("tbl:") or label.startswith("table:"):
-            return "tbl"
-        elif label.startswith("eq:") or label.startswith("equation:"):
-            return "eq"
-        elif label.startswith("ch:") or label.startswith("chapter:"):
-            return "ch"
-        return None
 
     def _write_caption(self, caption: Caption) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -861,9 +851,7 @@ class DocxWriter:
             # Apply dark background shading
             shading_elm = OxmlElement("w:shd")
             shading_elm.set(qn("w:fill"), "1E1E1E")
-            para._element.get_or_add_pPr().insert_element_before(
-                shading_elm, "w:spacing"
-            )
+            para._element.get_or_add_pPr().insert_element_before(shading_elm, "w:spacing")
 
             # Escape XML special characters
             escaped_line = self._escape_xml_text(line)

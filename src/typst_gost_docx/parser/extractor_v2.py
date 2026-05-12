@@ -1,6 +1,7 @@
 """State-machine based Typst extractor."""
 
 import logging
+import re
 import uuid
 from typing import Optional, List, Any
 from enum import Enum, auto
@@ -401,8 +402,6 @@ class TypstExtractorV2:
         Returns:
             IR TableNode or None if no table found
         """
-        import re
-
         # Look for table( pattern (with or without leading #)
         table_match = re.search(r"table\s*\(", content)
         if not table_match:
@@ -581,7 +580,6 @@ class TypstExtractorV2:
         title = "Содержание"  # Default title
 
         # Check for title: "..." parameter
-        import re
 
         title_match = re.search(r'title\s*:\s*"([^"]+)"', content)
         if title_match:
@@ -609,7 +607,6 @@ class TypstExtractorV2:
         token_value = token.value
 
         # Extract path from token value like #bibliography("refs.bib")
-        import re
 
         bib_path_match = re.search(r'"([^"]+\.bib)"', token_value)
         if not bib_path_match:
@@ -754,8 +751,6 @@ class TypstExtractorV2:
         Returns:
             List of ColSpec objects with width/width_percent/align
         """
-        import re
-
         columns: list[ColSpec] = []
 
         # Pattern: columns: (spec1, spec2, ...)
@@ -825,8 +820,6 @@ class TypstExtractorV2:
         Returns:
             Border width in points
         """
-        import re
-
         # Pattern: stroke: 0.7pt
         match = re.search(r"stroke:\s*([0-9.]+)(?:pt|mm)", content)
         if match:
@@ -846,8 +839,6 @@ class TypstExtractorV2:
         Returns:
             Fill lambda expression string or None
         """
-        import re
-
         # Pattern: fill: (col, row) => if row == 0 { ... }
         match = re.search(r"fill:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{[^}]+\}", content)
         if match:
@@ -867,8 +858,6 @@ class TypstExtractorV2:
         Returns:
             Align lambda expression string or None
         """
-        import re
-
         # Pattern: align: (col, row) => if row == 0 { ... }
         match = re.search(
             r"align:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{([^}]+)\}", content
@@ -899,8 +888,6 @@ class TypstExtractorV2:
         # Extract fill color from lambda if present
         fill_color = None
         if fill_lambda:
-            import re
-
             fill_match = re.search(r"\{\s*(luma|rgb)\(([^)]+)\)", fill_lambda)
             if fill_match:
                 fill_color = fill_match.group(2)
@@ -957,7 +944,6 @@ class TypstExtractorV2:
             rowspan = 1
 
             # Check for table.cell(colspan: N) or table.cell(rowspan: N)
-            import re
 
             colspan_match = re.search(r"table\.cell\(colspan:\s*(\d+)\)", content)
             rowspan_match = re.search(r"table\.cell\(rowspan:\s*(\d+)\)", content)
@@ -1055,8 +1041,6 @@ class TypstExtractorV2:
         Returns:
             List of IR nodes with proper formatting
         """
-        import re
-
         nodes: list[InlineNode] = []
 
         # Pattern for bold (*text*), italic (_text_), and code (`code`)
@@ -1201,8 +1185,6 @@ class TypstExtractorV2:
         Returns:
             Image path or None
         """
-        import re
-
         match = re.search(r'image\s*\(\s*"([^"]+)"', content)
         return match.group(1) if match else None
 
@@ -1215,7 +1197,5 @@ class TypstExtractorV2:
         Returns:
             Caption text or None
         """
-        import re
-
         match = re.search(r"caption\s*:\s*\[([^]]+)\]", content)
         return match.group(1) if match else None
