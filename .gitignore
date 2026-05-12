@@ -40,3 +40,9 @@ venv/
 # MemPalace per-project files (issue #185)
 mempalace.yaml
 entities.json
+
+# Graphify output
+graphify-out/
+
+# uv lockfile (project uses requirements)
+uv.lock

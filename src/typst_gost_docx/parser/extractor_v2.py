@@ -224,6 +224,15 @@ class TypstExtractorV2:
                 ref = self._extract_ref()
                 if ref:
                     nodes.append(ref)
+            elif token.type == "REF_INLINE":
+                # Handle @fig-1, @tbl:test, @eq:formula patterns
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                ref = self._extract_ref()
+                if ref:
+                    nodes.append(ref)
             elif token.type == "LABEL":
                 self._process_label()
             else:
@@ -312,6 +321,14 @@ class TypstExtractorV2:
                 numbering_kind=NumberingKind.TABLE if nested_table else NumberingKind.FIGURE,
             )
 
+        # Skip whitespace tokens between figure end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
+
         # Check for label immediately after figure
         # Labels can appear as <label> or be set via current_label
         if self.current_label:
@@ -374,6 +391,14 @@ class TypstExtractorV2:
                 row_cells = self._extract_row_cells(line, fill_lambda, align_lambda)
                 if row_cells:
                     table.rows.append(row_cells)
+
+        # Skip whitespace tokens between table end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
 
         # Check for label immediately after table
         # Labels can appear as <label> or be set via current_label
@@ -492,6 +517,14 @@ class TypstExtractorV2:
             latex=latex,
             numbering_kind=NumberingKind.EQUATION,
         )
+
+        # Skip whitespace tokens between equation end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
 
         # Check for label immediately after equation
         # Labels can appear as <label> or be set via current_label

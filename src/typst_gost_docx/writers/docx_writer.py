@@ -298,19 +298,26 @@ class DocxWriter:
             Returns:
                 True если успешно, False при ошибке.
             """
-            try:
-                from latex2mathml import converter
+            import logging
+            from .mml2omml import convert_mathml_to_omml
+            from latex2mathml import converter
 
-                omml = converter.convert(latex)
+            logger = logging.getLogger(__name__)
+
+            try:
+                # Convert LaTeX to MathML, then to OMML
+                mathml_str = converter.convert(latex)
+                omml = convert_mathml_to_omml(mathml_str)
+
+                if omml is None:
+                    logger.warning(f"Failed to convert equation to OMML. Latex: {latex}")
+                    return False
 
                 para = doc.add_paragraph(style="Normal")
                 run = para.add_run()
                 run._element.append(omml)
                 return True
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to render equation as OMML: {e}. Latex: {latex}")
                 return False
 

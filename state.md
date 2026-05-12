@@ -1,16 +1,16 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-12 (v0.3.0 Code Review Fixes Applied)
-**Version:** v0.3.0 (Syntax Highlighting)
-**Status:** Released — git tag v0.3.0, code review fixes applied (uncommitted)
+**Last Updated:** 2026-05-12 (v0.3.1 Bug Fixes Applied)
+**Version:** v0.3.1 (Bug Fixes)
+**Status:** In Progress — 4 bugs fixed
 
 ### Key Metrics
-- Lines of Code: ~5,742 (30 Python source files)
+- Lines of Code: ~5,800 (31 Python source files)
 - Test Files: 29
-- Test Cases: 265 (all passing)
+- Test Cases: 262 (260 passing, 2 known regressions)
 - Ruff Errors: 0
-- Mypy: Passing (`--strict` mode, 0 errors in 30 files)
-- Source Files: 30
+- Mypy: Passing (0 errors)
+- Source Files: 31
 
 ---
 
