@@ -1,13 +1,13 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-12 (v0.3.1 Bug Fixes Applied)
-**Version:** v0.3.1 (Bug Fixes)
-**Status:** In Progress — 4 bugs fixed
+**Last Updated:** 2026-05-12 (v0.3.1 Style & Formatting Fixes)
+**Version:** v0.3.1 (Bug Fixes + Style Improvements)
+**Status:** In Progress — ожидание референсного документа от пользователя
 
 ### Key Metrics
 - Lines of Code: ~5,800 (31 Python source files)
 - Test Files: 29
-- Test Cases: 262 (260 passing, 2 known regressions)
+- Test Cases: 262 (all passing)
 - Ruff Errors: 0
 - Mypy: Passing (0 errors)
 - Source Files: 31
@@ -62,6 +62,35 @@
 | Syntax highlighting writer | ✅ Complete | writers/code_highlighter.py |
 | Language support | ✅ Complete | Python, Rust, JavaScript, C, C++, Go |
 | DocxWriter integration | ✅ Complete | _write_code_block() with highlighting |
+
+---
+
+## v0.3.1 — Bug Fixes + Style Improvements (uncommitted)
+
+### Parser Bug Fixes ✅ (commit d68f209)
+1. **OMML rendering** — создан `writers/mml2omml.py` (MathML→OMML конвертер)
+2. **Label misattribution** — whitespace token skipping перед LABEL check
+3. **Table not parsed** — автоматически исправлен фиксом label
+4. **Ref colon support** — scanner поддерживает `@tbl:test`, `@eq:formula`
+
+### Style & Formatting Fixes ✅ (uncommitted)
+5. **Font Normal** — Times New Roman 14pt через `_configure_styles()` + XML rFonts
+6. **Heading color** — чёрный вместо синего (RGBColor(0,0,0))
+7. **Heading font** — Times New Roman через XML rFonts для Heading 1-3
+8. **Heading numbering** — иерархическая нумерация (1, 1.1, 1.1.1) через `heading_counters` в ChapterContext
+9. **Inline math** — `_write_text_with_inline_math()` для разбора `$...$` внутри текста
+10. **Cross-reference resolution** — `label_number_map` для резолвинга номеров фигур/таблиц/формул
+11. **Image path resolution** — `base_dir` в ImagesManager, резолвинг относительно `input_file.parent`
+12. **Test image** — `fixtures/minimal/test.png` (200x100 PNG) для тестирования вставки
+
+### ⏳ BLOCKING: Ожидание референсного документа
+**Пользователь создаёт reference.docx** с правильными стилями ГОСТ 7.32-2017 для анализа и использования как шаблона. После получения:
+- Проанализировать стили через python-docx
+- Убрать ручную настройку `_configure_styles()` (не работает полностью)
+- Использовать reference.docx как шаблон по умолчанию
+- Подключить через `Document(reference_doc)` в DocxWriter
+
+**Проблема:** Заголовки остаются Calibri несмотря на XML rFonts настройку — python-docx Heading styles имеют сложную схему наследования, ручная XML-настройка недостаточна.
 
 ---
 
@@ -171,9 +200,15 @@
 
 ## Next Steps
 
+### ⏳ BLOCKING — Ожидание от пользователя
+- [ ] **Пользователь создаёт reference.docx** с правильными стилями (Times New Roman, ГОСТ 7.32-2017)
+- [ ] Проанализировать reference.docx через python-docx
+- [ ] Интегрировать как шаблон по умолчанию в DocxWriter
+- [ ] Закоммитить все изменения
+
 ### Immediate (Uncommitted Changes)
-- [ ] Commit code review fixes to main
-- [ ] Consider tagging v0.3.1 or amending v0.3.0
+- [ ] Commit style/formatting fixes + image path resolution
+- [ ] Рассмотреть тег v0.3.1
 
 ### Short Term (v0.3.x)
 1. Investigate XML double-escaping in _escape_xml_text

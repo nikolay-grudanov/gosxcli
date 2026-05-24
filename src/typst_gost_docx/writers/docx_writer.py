@@ -7,7 +7,7 @@ from docx import Document
 from docx.document import Document as _Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches
+from docx.shared import Inches, Pt, RGBColor
 from docx.text.paragraph import Paragraph as DocxParagraph
 from ..ir.model import (
     Document as IRDocument,
@@ -51,6 +51,7 @@ class DocxWriter:
         math_mode: MathMode = MathMode.FALLBACK,
         ref_labels: Optional[RefLabels] = None,
         bibliography_style: CitationStyle = CitationStyle.NUMERIC,
+        base_dir: Optional[Path] = None,
     ):
         """Инициализирует DOCX writer.
 
@@ -59,6 +60,7 @@ class DocxWriter:
             math_mode: Режим рендеринга математических выражений.
             ref_labels: Локализованные метки для ссылок.
             bibliography_style: Стиль цитирования (numeric или author-year).
+            base_dir: Базовая директория для резолвинга относительных путей (изображения и т.д.).
         """
         self.reference_doc = reference_doc
         self.math_mode = math_mode
@@ -66,10 +68,11 @@ class DocxWriter:
         self.entry_lookup: dict[str, BibliographyEntry] = {}
         self.doc: Optional[_Document] = None
         self.bookmarks_manager = BookmarksManager()
-        self.images_manager = ImagesManager()
+        self.images_manager = ImagesManager(base_dir=base_dir)
         self.tables_manager = TablesManager()
         self.chapter_context = ChapterContext()
         self.ref_labels = ref_labels or RefLabels()
+        self.label_number_map: dict[str, tuple[int, int]] = {}  # label → (chapter_number, number)
 
         self.stats = {
             "headings": 0,
@@ -90,6 +93,9 @@ class DocxWriter:
 
         assert self.doc is not None, "Document not initialized"
 
+        # Configure default fonts for GOST compliance (Times New Roman, 14pt)
+        self._configure_styles()
+
         self._write_document(ir_document)
 
         self.doc.save(str(output_path))
@@ -105,6 +111,42 @@ class DocxWriter:
             Тип ссылки (fig, tbl, eq) или None.
         """
         return infer_ref_kind(label)
+
+    def _configure_styles(self) -> None:
+        """Конфигурирует стили документа для соответствия ГОСТ.
+
+        Настраивает шрифты по умолчанию:
+        - Normal: Times New Roman, 14pt
+        - Headings: чёрный цвет, Times New Roman
+        """
+        assert self.doc is not None, "Document not initialized"
+
+        # Issue 1: Set default font to Times New Roman, 14pt (GOST standard)
+        style = self.doc.styles["Normal"]
+        font = style.font
+        font.name = "Times New Roman"
+        font.size = Pt(14)
+
+        # Also set East Asian and Complex Script fonts
+        rPr = style.element.get_or_add_rPr()
+        rFonts = OxmlElement("w:rFonts")
+        rFonts.set(qn("w:ascii"), "Times New Roman")
+        rFonts.set(qn("w:hAnsi"), "Times New Roman")
+        rFonts.set(qn("w:cs"), "Times New Roman")
+        rPr.insert(0, rFonts)
+
+        # Issue 2: Override heading styles — black color, Times New Roman
+        for level in range(1, 4):
+            heading_style = self.doc.styles[f"Heading {level}"]
+            heading_style.font.color.rgb = RGBColor(0, 0, 0)  # Black
+            heading_style.font.name = "Times New Roman"
+            # Also set rFonts XML for heading styles (font.name alone is not enough)
+            h_rPr = heading_style.element.get_or_add_rPr()
+            h_rFonts = OxmlElement("w:rFonts")
+            h_rFonts.set(qn("w:ascii"), "Times New Roman")
+            h_rFonts.set(qn("w:hAnsi"), "Times New Roman")
+            h_rFonts.set(qn("w:cs"), "Times New Roman")
+            h_rPr.insert(0, h_rFonts)
 
     def _write_document(self, ir_doc: IRDocument) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -147,16 +189,37 @@ class DocxWriter:
             self.chapter_context.figure_counter = 0
             self.chapter_context.table_counter = 0
             self.chapter_context.equation_counter = 0
+            # Reset heading counters for new chapter
+            self.chapter_context.heading_counters = [0, 0, 0]
         else:
             # Non-level-1 sections use current chapter number
             section.chapter_number = self.chapter_context.chapter_number
 
         section.number = self.chapter_context.section_counter
 
+        # Issue 3: Sequential hierarchical heading numbering
+        level_idx = section.level - 1  # 0-based index
+        if 0 <= level_idx < 3:
+            # Increment heading counter for this level
+            self.chapter_context.heading_counters[level_idx] += 1
+            # Reset all lower-level counters
+            for i in range(level_idx + 1, 3):
+                self.chapter_context.heading_counters[i] = 0
+
+            # Build number string: "1" for level 1, "1.1" for level 2, "1.1.1" for level 3
+            nums = self.chapter_context.heading_counters[: level_idx + 1]
+            number_str = ".".join(str(n) for n in nums)
+        else:
+            number_str = ""
+
         style_name = self._get_heading_style(section.level)
 
         if section.title:
-            title_text = self._nodes_to_text(section.title)
+            # Prepend number to title
+            if number_str:
+                title_text = f"{number_str} {self._nodes_to_text(section.title)}"
+            else:
+                title_text = self._nodes_to_text(section.title)
             para = self.doc.add_paragraph(title_text, style=style_name)
             self.bookmarks_manager.add_bookmark_if_needed(para, section.label)
 
@@ -168,10 +231,54 @@ class DocxWriter:
         self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
+    def _write_inline_math(self, para: DocxParagraph, latex: str) -> None:
+        """Рендерит inline математику как OMML.
+
+        Args:
+            para: Параграф для добавления математики.
+            latex: LaTeX строка (без обрамляющих $).
+        """
+        try:
+            from .mml2omml import convert_mathml_to_omml
+            from latex2mathml import converter
+
+            mathml_str = converter.convert(latex)
+            omml = convert_mathml_to_omml(mathml_str)
+            if omml is not None:
+                run = para.add_run()
+                run._element.append(omml)
+                return
+        except Exception:
+            pass
+        # Fallback: render as plain text with $...$
+        run = para.add_run(f"${latex}$")
+        run.italic = True
+
+    def _write_text_with_inline_math(self, para: DocxParagraph, text: str) -> None:
+        """Разбивает текст на обычные фрагменты и inline math ($...$).
+
+        Args:
+            para: Параграф для добавления текста.
+            text: Текст, возможно содержащий $...$ фрагменты.
+        """
+        import re
+
+        parts = re.split(r"(\$[^$]+\$)", text)
+        for part in parts:
+            if part.startswith("$") and part.endswith("$") and len(part) > 2:
+                latex = part[1:-1]
+                self._write_inline_math(para, latex)
+            elif part:
+                para.add_run(part)
+
     def _write_inline_nodes(self, para: DocxParagraph, nodes: Sequence[BaseNode]) -> None:
         for node in nodes:
             if isinstance(node, TextRun):
-                para.add_run(node.text)
+                # Issue 4: Check for inline math ($...$) within text
+                if "$" in node.text:
+                    self._write_text_with_inline_math(para, node.text)
+                else:
+                    para.add_run(node.text)
             elif isinstance(node, InlineRunNode):
                 run = para.add_run(node.text)
                 if node.bold:
@@ -234,6 +341,10 @@ class DocxWriter:
             figure.caption.number = figure.number
             figure.caption.chapter_number = figure.chapter_number
 
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if figure.label:
+            self.label_number_map[figure.label] = (figure.chapter_number, figure.number)
+
         if figure.image_path:
             try:
                 self.images_manager.add_image(self.doc, figure.image_path, width=Inches(5.0))
@@ -257,6 +368,10 @@ class DocxWriter:
         if table.caption:
             table.caption.number = table.number
             table.caption.chapter_number = table.chapter_number
+
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if table.label:
+            self.label_number_map[table.label] = (table.chapter_number, table.number)
 
         self.tables_manager.add_table(self.doc, table)
 
@@ -285,6 +400,10 @@ class DocxWriter:
         if equation.caption:
             equation.caption.number = equation.number
             equation.caption.chapter_number = equation.chapter_number
+
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if equation.label:
+            self.label_number_map[equation.label] = (equation.chapter_number, equation.number)
 
         def _render_as_image(latex: str, doc: _Document) -> None:
             """Рендерит уравнение как текстовую заглушку (MVP)."""
@@ -693,6 +812,12 @@ class DocxWriter:
             ref: CrossRefNode для записи.
             para: Параграф для добавления текста ссылки.
         """
+        # Issue 5: Try to resolve numbers from already-written nodes
+        if ref.target_label in self.label_number_map:
+            chapter_num, num = self.label_number_map[ref.target_label]
+            ref.chapter_number = chapter_num
+            ref.number = num
+
         # Format reference text based on ref_kind and numbering
         ref_text = self._format_cross_ref(ref)
 

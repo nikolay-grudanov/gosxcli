@@ -470,6 +470,7 @@ class ChapterContext(BaseModel):
         chapter_number: Current chapter number (1-based).
         chapter_title: Title of the current chapter.
         section_counter: Counter for sections within the current chapter.
+        heading_counters: Hierarchical counters for heading numbering [level1, level2, level3].
     """
 
     chapter_number: int = 1
@@ -478,6 +479,7 @@ class ChapterContext(BaseModel):
     figure_counter: int = 0
     table_counter: int = 0
     equation_counter: int = 0
+    heading_counters: list[int] = [0, 0, 0]
 
 
 # Type alias for inline nodes (used in Paragraph.runs)

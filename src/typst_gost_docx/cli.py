@@ -137,6 +137,7 @@ def _run_conversion(config: Config) -> dict[str, Any]:
         reference_doc=config.reference_doc,
         math_mode=config.math_mode,
         ref_labels=config.ref_labels,
+        base_dir=config.input_file.parent,
     )
     stats = writer.write(ir_document, config.output_file)
     write_time = time.time() - write_start_time

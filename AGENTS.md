@@ -4,13 +4,20 @@
 
 **Typst GOST DOCX Converter (gosxcli)** — CLI инструмент для конвертации Typst документов в DOCX с поддержкой стилизации по ГОСТ 7.32-2017. Проект предназначен для академических документов, диссертаций и научных работ.
 
-**Status:** MVP v0.1
+**Status:** MVP v0.3.1 (awaiting reference.docx for style fix)
 
 **Tech Stack:** Python 3.12+, Typer, Pydantic v2, python-docx, lxml, Rich
 
 **Constitution:** [.specify/memory/constitution.md](.specify/memory/constitution.md) — принципы проекта, IR-контракт, правила работы агентов
 
 **Project State:** [state.md](state.md) — текущий статус, прогресс, известные проблемы (ОБЯЗАТЕЛЬНО читать перед работой и обновлять после)
+
+### ⏳ BLOCKING: Ожидание референсного документа
+**Пользователь создаёт `reference.docx`** с правильно оформленными стилями ГОСТ 7.32-2017 (Times New Roman, чёрные заголовки, 14pt). После получения документа:
+1. Проанализировать стили через python-docx (шрифты, размеры, отступы, цвета)
+2. Убрать ручную настройку `_configure_styles()` из `docx_writer.py` (не работает полностью для Heading стилей)
+3. Использовать reference.docx как шаблон по умолчанию через `Document(reference_doc)`
+4. Верифицировать результат конвертации через MiniMax image analysis
 
 ---
 

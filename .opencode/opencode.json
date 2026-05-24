@@ -11,11 +11,11 @@
       "hidden": false
     },
     "gosxcli-developer": {
-      "model": "minimax-coding-plan/MiniMax-M2.5",
+      "model": "minimax-coding-plan/MiniMax-M2.1",
       "hidden": false
     },
     "gosxcli-reviewer": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
       "hidden": false
     }
   }
