@@ -16,6 +16,7 @@ from .ingest.project_loader import TypstProjectLoader
 from .logging import setup_logging
 from .parser.extractor_v2 import TypstExtractorV2
 from .writers.docx_writer import DocxWriter
+from .writers.styles import get_default_template_path
 
 if TYPE_CHECKING:
     from .ir.model import BaseNode, Document
@@ -118,8 +119,26 @@ def _run_conversion(config: Config) -> dict[str, Any]:
 
     # Извлечение IR
     parse_start_time = time.time()
-    text = files[str(config.input_file)]
-    extractor = TypstExtractorV2(text, str(config.input_file))
+    text = loader.resolve_includes(files)
+
+    # Поиск библиографических файлов для распознавания цитирований
+    bib_keys: set[str] = set()
+    bib_files = list(config.input_file.parent.glob("*.bib"))
+    if bib_files:
+        from .parser.bibliography import parse_bibliography
+
+        for bib_file in bib_files:
+            try:
+                bib_content = bib_file.read_text(encoding="utf-8")
+                parsed = parse_bibliography(bib_content)
+                bib_keys.update(parsed.entries.keys())
+                logger.debug(
+                    "Загружены ключи библиографии из %s: %d", bib_file.name, len(parsed.entries)
+                )
+            except Exception as e:
+                logger.warning("Ошибка чтения библиографии %s: %s", bib_file, e)
+
+    extractor = TypstExtractorV2(text, str(config.input_file), bib_keys=bib_keys)
     ir_document = extractor.extract()
     parse_time = time.time() - parse_start_time
 
@@ -131,6 +150,27 @@ def _run_conversion(config: Config) -> dict[str, Any]:
             json.dump(ir_json, f, indent=2, ensure_ascii=False)
         console.print(f"[dim]IR dumped to: {json_path}[/dim]")
 
+    # Resolve template path for reporting and debug output
+    resolved_template: Optional[Path] = None
+    template_source: str = "none"
+    if config.reference_doc is not None:
+        if config.reference_doc.exists():
+            resolved_template = config.reference_doc
+            template_source = "custom"
+        else:
+            logger.warning("Пользовательский шаблон не найден: %s", config.reference_doc)
+            resolved_template = get_default_template_path()
+            template_source = "built-in" if resolved_template else "none"
+    else:
+        resolved_template = get_default_template_path()
+        template_source = "built-in" if resolved_template else "none"
+
+    logger.info(
+        "Шаблон: %s (%s)",
+        resolved_template or "нет",
+        template_source,
+    )
+
     # Генерация DOCX
     write_start_time = time.time()
     writer = DocxWriter(
@@ -141,6 +181,10 @@ def _run_conversion(config: Config) -> dict[str, Any]:
     )
     stats = writer.write(ir_document, config.output_file)
     write_time = time.time() - write_start_time
+
+    # Add template info to stats
+    stats["template_path"] = str(resolved_template) if resolved_template else "—"
+    stats["template_source"] = template_source
 
     total_time = time.time() - total_start_time
 
@@ -235,6 +279,8 @@ def _print_summary(stats: dict[str, Any]) -> None:
     table.add_row("References resolved", str(stats.get("refs_resolved", 0)))
     table.add_row("References unresolved", str(stats.get("refs_unresolved", 0)))
     table.add_row("Warnings", str(stats.get("warnings", 0)))
+    table.add_row("Template", str(stats.get("template_path", "—")))
+    table.add_row("Template source", str(stats.get("template_source", "—")))
 
     console.print()
     console.print(table)

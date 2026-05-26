@@ -1,8 +1,8 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-12 (v0.3.1 Style & Formatting Fixes)
+**Last Updated:** 2026-05-25 (v0.3.1 → Real thesis bug fixes complete)
 **Version:** v0.3.1 (Bug Fixes + Style Improvements)
-**Status:** In Progress — ожидание референсного документа от пользователя
+**Status:** В разработке — spec 005-template-integration Phase 2 ✅ (T001-T008 done, Phase 3-6 pending)
 
 ### Key Metrics
 - Lines of Code: ~5,800 (31 Python source files)
@@ -83,14 +83,18 @@
 11. **Image path resolution** — `base_dir` в ImagesManager, резолвинг относительно `input_file.parent`
 12. **Test image** — `fixtures/minimal/test.png` (200x100 PNG) для тестирования вставки
 
-### ⏳ BLOCKING: Ожидание референсного документа
-**Пользователь создаёт reference.docx** с правильными стилями ГОСТ 7.32-2017 для анализа и использования как шаблона. После получения:
-- Проанализировать стили через python-docx
-- Убрать ручную настройку `_configure_styles()` (не работает полностью)
-- Использовать reference.docx как шаблон по умолчанию
-- Подключить через `Document(reference_doc)` в DocxWriter
+### Real Thesis Bug Fixes ✅ (new)
+13. **Image path resolution for chapters** — добавлен метод `_rewrite_image_paths()` в project_loader.py для исправления путей изображений из глав (chapters/) относительно корня проекта
+14. **Bibliography citation recognition** — добавлен параметр `bib_keys` в TypstExtractorV2 для распознавания цитирований `@key` против перекрёстных ссылок
+15. **Missing styles fallback** — добавлен метод `_create_fallback_style()` в StyleResolver для динамического создания стилей List Bullet, List Number, Heading N при отсутствии в шаблоне
 
-**Проблема:** Заголовки остаются Calibri несмотря на XML rFonts настройку — python-docx Heading styles имеют сложную схему наследования, ручная XML-настройка недостаточна.
+### ⏳→✅ BLOCKING RESOLVED: Референсный документ получен
+**Шаблон получен:** `template/Шаблон_оформления_ВКР_2026_новый.docx`
+- Проанализированы стили через python-docx и XML ✅
+- Создан план интеграции: `specs/005-template-integration/` ✅
+- **Критическое открытие:** Нестандартные style_id ('781','782','783') для Heading 1-3 — `doc.styles['Heading 1']` → KeyError
+- Решение: StyleResolver с итеративным fallback + кэширование
+- **Следующий шаг:** Реализация spec 005-template-integration (ветка `005-template-integration`)
 
 ---
 
@@ -195,15 +199,23 @@
 | 2026-05-12 | Delete math_renderer.py (dead code) | Inline rendering in docx_writer; separate module was unused |
 | 2026-05-12 | Extract infer_ref_kind() to utils/ref_utils.py | DRY principle — was duplicated in docx_writer.py and refs.py |
 | 2026-05-12 | PrivateAttr for _content in Paragraph | Pydantic v2 doesn't support _-prefixed fields without PrivateAttr |
+| 2026-05-24 | Spec 005-template-integration plan created | Референсный ВКР шаблон получен, StyleResolver с итеративным fallback для нестандартных style_id |
+| 2026-05-24 | Non-standard style_id workaround | Heading 1-3 имеют style_id '781-783' вместо стандартных 'Heading1-3'; решается итеративным поиском |
+| 2026-05-24 | 005 Phase 2: StyleResolver + TemplateLoader | Monkeypatch Styles.__getitem__ для обхода BabelFish bug; _clear_document_body() для очистки контента шаблона; initialize_fallback_styles() для Document() fallback |
+| 2026-05-24 | 005 Phase 4: Custom Template Styles | Реализованы T014-T018: _is_unnumbered_heading(), обнаружение ненумерованных заголовков, раздельные стили caption_table/caption_figure, equation стиль, обработка KeyError для Table Grid |
 
 ---
 
 ## Next Steps
 
-### ⏳ BLOCKING — Ожидание от пользователя
-- [ ] **Пользователь создаёт reference.docx** с правильными стилями (Times New Roman, ГОСТ 7.32-2017)
-- [ ] Проанализировать reference.docx через python-docx
-- [ ] Интегрировать как шаблон по умолчанию в DocxWriter
+### ⏳ BLOCKING — Ожидание от пользователя → ✅ РЕШЕНО
+- [x] **Пользователь предоставил шаблон** `Шаблон_оформления_ВКР_2026_новый.docx`
+- [x] Проанализировать стили через python-docx + XML
+- [x] Создать план интеграции (spec 005)
+- [x] Реализовать spec 005-template-integration Phase 1-2 (T001-T008)
+- [x] Реализовать spec 005 Phase 4: Custom Template Styles (T014-T018) ✅
+- [ ] Реализовать spec 005 Phase 3 (T009-T013)
+- [ ] Реализовать spec 005 Phase 5-6 (T019-T024)
 - [ ] Закоммитить все изменения
 
 ### Immediate (Uncommitted Changes)
@@ -235,4 +247,4 @@
 
 ---
 
-**Last Updated by:** @gosxcli-orchestrator (2026-05-12)
+**Last Updated by:** @gosxcli-orchestrator (2026-05-24)

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="drawio-from-spec" version="24.7.17" type="device">
+  <diagram id="p-355246b5" name="gosxcli — Процесс конвертации (sequence)">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1540" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="CLI-aa31f582" value=":CLI\n(gosxcli convert)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="60" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="Config-1505cb9b" value=":Config\n(Pydantic)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="300" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="Ingest-048945da" value=":ProjectLoader\n(Typst client)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="540" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="Parser-e73fedc6" value=":Extractor\n(IR builder)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="780" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="Writer-a4867a29" value=":DocxWriter\n(python-docx)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="Styles-8206125e" value=":Styles\n(TNR 14pt)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#FFFFFF;strokeColor=#333333;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="40" width="160" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="m-789c6350" value="load_config()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="CLI-aa31f582" target="Config-1505cb9b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-31cd2a5e" value="load_project()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="CLI-aa31f582" target="Ingest-048945da">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-77f5a207" value="typst.compile()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Ingest-048945da" target="Parser-e73fedc6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-0bb7a791" value="IR: Paragraph(text)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Parser-e73fedc6" target="Ingest-048945da">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-7c2dfdba" value="IR nodes list" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Parser-e73fedc6" target="Writer-a4867a29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-520d4025" value="apply_style()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Writer-a4867a29" target="Styles-8206125e">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-e122637a" value="w:pPr styled" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Styles-8206125e" target="Writer-a4867a29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m-6d4f32f0" value="thesis_final.docx" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;curved=0;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="Writer-a4867a29" target="CLI-aa31f582">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

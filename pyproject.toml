@@ -48,6 +48,9 @@ typst-gost-docx = "typst_gost_docx.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+typst_gost_docx = ["templates/*.docx"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

@@ -1,0 +1,42 @@
+{
+  "type": "fad_macro",
+  "title": "UC-01 — Конвертация Typst → DOCX (макрошаг)",
+  "actor": "Пользователь",
+  "page": {"w": 1500, "h": 1100},
+  "steps": [
+    {
+      "label": "typst-gost-docx convert\ninput.typ output.docx",
+      "io":   "input.typ",
+      "rule": "CLI-интерфейс:\nTyper + Pydantic v2",
+      "tool": "cli.py"
+    },
+    {
+      "label": "ProjectLoader.load()\n→ TypstProject",
+      "io":   "TypstProject",
+      "rule": "Поддержка #include\nс depth-лимитом",
+      "tool": "ingest/\nproject_loader.py"
+    },
+    {
+      "label": "TypstScanner.tokenize()\n→ token stream",
+      "io":   "tokens",
+      "rule": "Пропуск whitespace\nперед LABEL token",
+      "tool": "parser/scanner.py"
+    },
+    {
+      "label": "IRBuilder.build()\n→ IRDocument",
+      "rule": "4-слойный IR:\nIngest→Parser→IR→Writer",
+      "tool": "parser/extractor.py\nir/model.py"
+    },
+    {
+      "label": "DocxWriter.write()\n: IRDocument → .docx",
+      "io":   "output.docx",
+      "rule": "python-docx API:\nparagraphs, tables,\nimages, math (OMML)",
+      "tool": "writers/\ndocx_writer.py"
+    },
+    {
+      "label": "ValidationResult:\nстили, шрифты,\nГОСТ 7.32-2017",
+      "rule": "Times New Roman 14pt,\nчёрные заголовки,\nнумерация 1/1.1/1.1.1",
+      "tool": "writers/styles.py\nwriters/mml2omml.py"
+    }
+  ]
+}

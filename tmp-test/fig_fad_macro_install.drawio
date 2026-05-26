@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="fad-rup-drawio" version="24.7.17" type="device">
+  <diagram id="p-8a933361" name="UC-02 — Установка системных шрифтов (макрошаг)">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="frame-a8212d8c" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="1460" height="860" as="geometry" />
+        </mxCell>
+        <mxCell id="title-9dedebe7" value="UC-02 — Установка системных шрифтов (макрошаг)" style="shape=mxgraph.sysml.package1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#333333;strokeWidth=1.0;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="408" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="colsbox-4509888c" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;strokeWidth=1.0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1420" height="790" as="geometry" />
+        </mxCell>
+        <mxCell id="colhead-7634baaa" value="Входные/Выходные данные" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#333333;fontSize=11;fontStyle=1;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="209.26315789473682" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="colhead-68c9b89a" value="Деятельность" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#333333;fontSize=11;fontStyle=1;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="249.26315789473682" y="70" width="538.1052631578947" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="sep-967a0ccd" value="" style="endArrow=none;html=1;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="249.26315789473682" y="70" as="sourcePoint" />
+            <mxPoint x="249.26315789473682" y="860" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="colhead-a0a6dfe7" value="Роль" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#333333;fontSize=11;fontStyle=1;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="787.3684210526314" y="70" width="209.26315789473682" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="sep-1ae062d8" value="" style="endArrow=none;html=1;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="787.3684210526314" y="70" as="sourcePoint" />
+            <mxPoint x="787.3684210526314" y="860" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="colhead-1deaadf6" value="Бизнес-правило" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#333333;fontSize=11;fontStyle=1;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="996.6315789473683" y="70" width="254.10526315789474" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="sep-e76ba838" value="" style="endArrow=none;html=1;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="996.6315789473683" y="70" as="sourcePoint" />
+            <mxPoint x="996.6315789473683" y="860" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="colhead-14c9c461" value="Инструмент" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#333333;fontSize=11;fontStyle=1;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1250.7368421052631" y="70" width="209.26315789473682" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="sep-1d9a5369" value="" style="endArrow=none;html=1;strokeColor=#333333;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250.7368421052631" y="70" as="sourcePoint" />
+            <mxPoint x="1250.7368421052631" y="860" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="start-23917e3e" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="508.31578947368416" y="120" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="task-ff17f61b" value="typst-gost-docx install-fonts&#10;--source reference.docx" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#FFFFFF;strokeColor=#333333;strokeWidth=1.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="279.2631578947369" y="250" width="478.10526315789457" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="taski-9a316b40" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=none;strokeColor=#333333;strokeWidth=0.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="283.2631578947369" y="254" width="470.10526315789457" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e-beb90a69" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="start-23917e3e" target="task-ff17f61b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note-a19ef9af" value="Администратор&#10;(достаёт шрифты)" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1011.6315789473684" y="250" width="224.1052631578948" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="note-ef5f10da" value="cli.py" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1265.7368421052633" y="250" width="179.26315789473688" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="task-cb3f61ed" value="extract_fonts_from_docx()&#10;→ font list" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#FFFFFF;strokeColor=#333333;strokeWidth=1.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="279.2631578947369" y="340" width="478.10526315789457" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="taski-b3bf2bf0" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=none;strokeColor=#333333;strokeWidth=0.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="283.2631578947369" y="344" width="470.10526315789457" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e-f289276d" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="task-ff17f61b" target="task-cb3f61ed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="io-04d8ed76" value="reference.docx" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="55.0" y="345" width="179.26315789473682" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="note-e62493a0" value="python-docx:&#10;font extraction API" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1011.6315789473684" y="340" width="224.1052631578948" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="note-c4d804cc" value="extract_docx.py" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1265.7368421052633" y="340" width="179.26315789473688" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="task-5dbd79cf" value="Проверка: fontconfig&#10;или lualatex --version" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#FFFFFF;strokeColor=#333333;strokeWidth=1.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="279.2631578947369" y="430" width="478.10526315789457" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="taski-95540921" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=none;strokeColor=#333333;strokeWidth=0.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="283.2631578947369" y="434" width="470.10526315789457" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e-28966c0b" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="task-cb3f61ed" target="task-5dbd79cf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note-a68b110b" value="ОС: Linux (fontconfig),&#10;Windows (bundled)" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1011.6315789473684" y="430" width="224.1052631578948" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="note-93df3196" value="config.py" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1265.7368421052633" y="430" width="179.26315789473688" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="task-96490e8b" value="Установка в&#10;~/.local/share/fonts/" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#FFFFFF;strokeColor=#333333;strokeWidth=1.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="279.2631578947369" y="520" width="478.10526315789457" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="taski-a12c0ad3" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=none;strokeColor=#333333;strokeWidth=0.6;fontSize=11;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="283.2631578947369" y="524" width="470.10526315789457" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ae7d551e" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="task-5dbd79cf" target="task-96490e8b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="io-4953ee57" value="Шрифты в системе" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;fontFamily=Times New Roman;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="55.0" y="525" width="179.26315789473682" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="note-0e8c6927" value="Пользователь имеет&#10;права записи" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1011.6315789473684" y="520" width="224.1052631578948" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="note-782ce92a" value="fc-cache -rv" style="shape=note;whiteSpace=wrap;html=1;size=14;backgroundOutline=1;fillColor=#FFFFFF;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=10;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="1265.7368421052633" y="520" width="179.26315789473688" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="end-45d392ab" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="506.31578947368416" y="608" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="endi-01ddc2ff" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="511.71578947368414" y="613.4" width="13.200000000000001" height="13.200000000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="e-86656908" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333;fontSize=10;fontFamily=Times New Roman;" edge="1" parent="1" source="task-96490e8b" target="end-45d392ab">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="actor-444f9912" value="Пользователь" style="shape=umlActor;html=1;outlineConnect=0;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;fontSize=11;fontFamily=Times New Roman;" vertex="1" parent="1">
+          <mxGeometry x="876.9999999999999" y="385.0" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="erol-9c1aa537" value="" style="endArrow=open;dashed=1;endFill=0;html=1;rounded=0;strokeColor=#666666;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="actor-444f9912">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="757.3684210526314" y="280.0" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="erol-db4e1f03" value="" style="endArrow=open;dashed=1;endFill=0;html=1;rounded=0;strokeColor=#666666;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="actor-444f9912">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="757.3684210526314" y="460.0" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="erol-b50211b1" value="" style="endArrow=open;dashed=1;endFill=0;html=1;rounded=0;strokeColor=#666666;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="actor-444f9912">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="757.3684210526314" y="550.0" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

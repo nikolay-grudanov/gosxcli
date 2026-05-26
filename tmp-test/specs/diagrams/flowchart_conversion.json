@@ -1,0 +1,38 @@
+{
+  "type": "flowchart",
+  "title": "gosxcli — Конвейер конвертации",
+  "page": {"w": 850, "h": 1200},
+  "nodes": [
+    {"id": "start",   "label": "Начало",                    "x": 340, "y": 30,  "w": 120, "h": 50, "shape": "start"},
+    {"id": "load",    "label": "Загрузка .typ\\n(Ingest)",   "x": 340, "y": 120, "w": 140, "h": 60, "shape": "process"},
+    {"id": "parse",   "label": "Парсинг Typst\\n→ IR nodes",   "x": 340, "y": 220, "w": 140, "h": 60, "shape": "process"},
+    {"id": "ir_valid","label": "Валидация IR",               "x": 340, "y": 320, "w": 140, "h": 50, "shape": "process"},
+    {"id": "branch",  "label": "Тип узла?",                  "x": 340, "y": 410, "w": 120, "h": 50, "shape": "decision"},
+    {"id": "para",    "label": "Параграф\\n→ пакет символов",  "x": 100, "y": 510, "w": 130, "h": 60, "shape": "process"},
+    {"id": "heading", "label": "Заголовок\\n→ Heading стиль",  "x": 280, "y": 510, "w": 130, "h": 60, "shape": "process"},
+    {"id": "figure",  "label": "Рисунок\\n→ Подпись + картинка","x": 460, "y": 510, "w": 140, "h": 60, "shape": "process"},
+    {"id": "table",   "label": "Таблица\\n→ DOCX table",      "x": 640, "y": 510, "w": 130, "h": 60, "shape": "process"},
+    {"id": "math",    "label": "Формула\\n→ MathML/OMML",     "x": 820, "y": 510, "w": 130, "h": 60, "shape": "process"},
+    {"id": "write",   "label": "Запись в DOCX",             "x": 340, "y": 620, "w": 140, "h": 50, "shape": "process"},
+    {"id": "gost",    "label": "GOST normalization",        "x": 340, "y": 710, "w": 140, "h": 50, "shape": "process"},
+    {"id": "end",     "label": "Конец\\n(thesis_final.docx)", "x": 340, "y": 800, "w": 140, "h": 60, "shape": "end"}
+  ],
+  "edges": [
+    {"src": "start",   "dst": "load"},
+    {"src": "load",    "dst": "parse"},
+    {"src": "parse",   "dst": "ir_valid"},
+    {"src": "ir_valid", "dst": "branch"},
+    {"src": "branch",  "dst": "para",    "label": "paragraph"},
+    {"src": "branch",  "dst": "heading", "label": "heading"},
+    {"src": "branch",  "dst": "figure",  "label": "figure"},
+    {"src": "branch",  "dst": "table",   "label": "table"},
+    {"src": "branch",  "dst": "math",    "label": "math"},
+    {"src": "para",    "dst": "write"},
+    {"src": "heading", "dst": "write"},
+    {"src": "figure",  "dst": "write"},
+    {"src": "table",   "dst": "write"},
+    {"src": "math",    "dst": "write"},
+    {"src": "write",   "dst": "gost"},
+    {"src": "gost",    "dst": "end"}
+  ]
+}

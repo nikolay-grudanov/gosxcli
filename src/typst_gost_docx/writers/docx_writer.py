@@ -3,11 +3,10 @@
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from docx import Document
 from docx.document import Document as _Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches
 from docx.text.paragraph import Paragraph as DocxParagraph
 from ..ir.model import (
     Document as IRDocument,
@@ -41,6 +40,7 @@ from ..utils.ref_utils import infer_ref_kind
 from .bookmarks import BookmarksManager
 from .images import ImagesManager
 from .tables import TablesManager
+from .styles import StyleResolver, load_document, is_unnumbered_heading
 from .code_highlighter import highlight_code, is_supported_language
 
 
@@ -73,6 +73,7 @@ class DocxWriter:
         self.chapter_context = ChapterContext()
         self.ref_labels = ref_labels or RefLabels()
         self.label_number_map: dict[str, tuple[int, int]] = {}  # label → (chapter_number, number)
+        self._style_resolver: Optional[StyleResolver] = None
 
         self.stats = {
             "headings": 0,
@@ -85,16 +86,34 @@ class DocxWriter:
             "warnings": 0,
         }
 
+    @property
+    def style_resolver(self) -> StyleResolver:
+        """Lazy initialize StyleResolver for backward compatibility with tests."""
+        if self._style_resolver is None:
+            if self.doc is None:
+                self.doc = load_document(self.reference_doc)
+            self._style_resolver = StyleResolver(self.doc)
+        assert self._style_resolver is not None
+        return self._style_resolver
+
+    @style_resolver.setter
+    def style_resolver(self, value: Optional[StyleResolver]) -> None:
+        self._style_resolver = value
+
+    def _is_unnumbered_heading(self, text: str) -> bool:
+        """Проверяет, является ли заголовок ненумерованным (ВВЕДЕНИЕ, ЗАКЛЮЧЕНИЕ и т.д.).
+
+        Args:
+            text: Текст заголовка для проверки.
+
+        Returns:
+            True если текст содержит ключевое слово ненумерованного заголовка.
+        """
+        return is_unnumbered_heading(text)
+
     def write(self, ir_document: IRDocument, output_path: Path) -> dict[str, Any]:
-        if self.reference_doc and self.reference_doc.exists():
-            self.doc = Document(str(self.reference_doc))
-        else:
-            self.doc = Document()
-
-        assert self.doc is not None, "Document not initialized"
-
-        # Configure default fonts for GOST compliance (Times New Roman, 14pt)
-        self._configure_styles()
+        self.doc = load_document(self.reference_doc)
+        self.style_resolver = StyleResolver(self.doc)
 
         self._write_document(ir_document)
 
@@ -111,42 +130,6 @@ class DocxWriter:
             Тип ссылки (fig, tbl, eq) или None.
         """
         return infer_ref_kind(label)
-
-    def _configure_styles(self) -> None:
-        """Конфигурирует стили документа для соответствия ГОСТ.
-
-        Настраивает шрифты по умолчанию:
-        - Normal: Times New Roman, 14pt
-        - Headings: чёрный цвет, Times New Roman
-        """
-        assert self.doc is not None, "Document not initialized"
-
-        # Issue 1: Set default font to Times New Roman, 14pt (GOST standard)
-        style = self.doc.styles["Normal"]
-        font = style.font
-        font.name = "Times New Roman"
-        font.size = Pt(14)
-
-        # Also set East Asian and Complex Script fonts
-        rPr = style.element.get_or_add_rPr()
-        rFonts = OxmlElement("w:rFonts")
-        rFonts.set(qn("w:ascii"), "Times New Roman")
-        rFonts.set(qn("w:hAnsi"), "Times New Roman")
-        rFonts.set(qn("w:cs"), "Times New Roman")
-        rPr.insert(0, rFonts)
-
-        # Issue 2: Override heading styles — black color, Times New Roman
-        for level in range(1, 4):
-            heading_style = self.doc.styles[f"Heading {level}"]
-            heading_style.font.color.rgb = RGBColor(0, 0, 0)  # Black
-            heading_style.font.name = "Times New Roman"
-            # Also set rFonts XML for heading styles (font.name alone is not enough)
-            h_rPr = heading_style.element.get_or_add_rPr()
-            h_rFonts = OxmlElement("w:rFonts")
-            h_rFonts.set(qn("w:ascii"), "Times New Roman")
-            h_rFonts.set(qn("w:hAnsi"), "Times New Roman")
-            h_rFonts.set(qn("w:cs"), "Times New Roman")
-            h_rPr.insert(0, h_rFonts)
 
     def _write_document(self, ir_doc: IRDocument) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -179,6 +162,10 @@ class DocxWriter:
         assert self.doc is not None, "Document not initialized"
         self.stats["headings"] += 1
 
+        # Get title text early to detect unnumbered headings
+        title_text = self._nodes_to_text(section.title) if section.title else ""
+        is_unnumbered = self._is_unnumbered_heading(title_text) if title_text else False
+
         # Chapter-aware numbering: increment chapter on level 1 sections
         if section.level == 1:
             # Store current chapter number in the section
@@ -197,37 +184,48 @@ class DocxWriter:
 
         section.number = self.chapter_context.section_counter
 
-        # Issue 3: Sequential hierarchical heading numbering
-        level_idx = section.level - 1  # 0-based index
-        if 0 <= level_idx < 3:
-            # Increment heading counter for this level
-            self.chapter_context.heading_counters[level_idx] += 1
-            # Reset all lower-level counters
-            for i in range(level_idx + 1, 3):
-                self.chapter_context.heading_counters[i] = 0
-
-            # Build number string: "1" for level 1, "1.1" for level 2, "1.1.1" for level 3
-            nums = self.chapter_context.heading_counters[: level_idx + 1]
-            number_str = ".".join(str(n) for n in nums)
-        else:
+        if is_unnumbered:
+            # Unnumbered headings: no number prefix, use special style
             number_str = ""
+            heading_ir_type = "heading_unnumbered"
+        else:
+            # Issue 3: Sequential hierarchical heading numbering
+            level_idx = section.level - 1  # 0-based index
+            if 0 <= level_idx < 3:
+                # Increment heading counter for this level
+                self.chapter_context.heading_counters[level_idx] += 1
+                # Reset all lower-level counters
+                for i in range(level_idx + 1, 3):
+                    self.chapter_context.heading_counters[i] = 0
 
-        style_name = self._get_heading_style(section.level)
+                # Build number string: "1" for level 1, "1.1" for level 2, "1.1.1" for level 3
+                nums = self.chapter_context.heading_counters[: level_idx + 1]
+                number_str = ".".join(str(n) for n in nums)
+            else:
+                number_str = ""
+
+            heading_ir_type = f"heading_{section.level}"
 
         if section.title:
-            # Prepend number to title
+            # Prepend number to title (only for numbered headings)
             if number_str:
-                title_text = f"{number_str} {self._nodes_to_text(section.title)}"
+                display_text = f"{number_str} {title_text}"
             else:
-                title_text = self._nodes_to_text(section.title)
-            para = self.doc.add_paragraph(title_text, style=style_name)
+                display_text = title_text
+            para = self.doc.add_paragraph(display_text)
+            heading_style = self.style_resolver.resolve(heading_ir_type)
+            if heading_style:
+                self.style_resolver.apply_paragraph_style(para, heading_style)
             self.bookmarks_manager.add_bookmark_if_needed(para, section.label)
 
     def _write_paragraph(self, paragraph: Paragraph) -> None:
         assert self.doc is not None, "Document not initialized"
         self.stats["paragraphs"] += 1
 
-        para = self.doc.add_paragraph(style="Normal")
+        para = self.doc.add_paragraph()
+        normal_style = self.style_resolver.resolve("normal")
+        if normal_style:
+            self.style_resolver.apply_paragraph_style(para, normal_style)
         self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
@@ -305,11 +303,16 @@ class DocxWriter:
 
     def _write_list(self, list_block: ListBlock) -> None:
         assert self.doc is not None, "Document not initialized"
-        style = "List Bullet" if list_block.kind == ListKind.BULLET else "List Number"
+
+        # Resolve list style using StyleResolver
+        ir_type = "list_bullet" if list_block.kind == ListKind.BULLET else "list_number"
+        list_style = self.style_resolver.resolve(ir_type)
 
         for item in list_block.items:
             text = self._nodes_to_text(item.content)
-            self.doc.add_paragraph(text, style=style)
+            para = self.doc.add_paragraph(text)
+            if list_style:
+                self.style_resolver.apply_paragraph_style(para, list_style)
 
     def _write_figure(self, figure: Figure) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -407,7 +410,10 @@ class DocxWriter:
 
         def _render_as_image(latex: str, doc: _Document) -> None:
             """Рендерит уравнение как текстовую заглушку (MVP)."""
-            para = doc.add_paragraph(style="Normal")
+            para = doc.add_paragraph()
+            equation_style = self.style_resolver.resolve("equation")
+            if equation_style:
+                self.style_resolver.apply_paragraph_style(para, equation_style)
             para.add_run(f"[FORMULA: {latex}]")
             self.stats["warnings"] += 1
 
@@ -432,7 +438,10 @@ class DocxWriter:
                     logger.warning(f"Failed to convert equation to OMML. Latex: {latex}")
                     return False
 
-                para = doc.add_paragraph(style="Normal")
+                para = doc.add_paragraph()
+                equation_style = self.style_resolver.resolve("equation")
+                if equation_style:
+                    self.style_resolver.apply_paragraph_style(para, equation_style)
                 run = para.add_run()
                 run._element.append(omml)
                 return True
@@ -467,12 +476,18 @@ class DocxWriter:
         """
         assert self.doc is not None, "Document not initialized"
         # Add TOC title as Heading 1
-        self.doc.add_paragraph(toc.title, style="Heading 1")
+        toc_heading = self.doc.add_paragraph(toc.title)
+        heading_style = self.style_resolver.resolve("heading_1")
+        if heading_style:
+            self.style_resolver.apply_paragraph_style(toc_heading, heading_style)
 
         # Add placeholder paragraph for TOC content
         # In a full implementation, this would be a TOC field
         # For MVP, we add a placeholder that indicates where TOC should be
-        placeholder = self.doc.add_paragraph(style="Normal")
+        placeholder = self.doc.add_paragraph()
+        normal_style = self.style_resolver.resolve("normal")
+        if normal_style:
+            self.style_resolver.apply_paragraph_style(placeholder, normal_style)
         placeholder.add_run(
             "[Table of Contents will be generated here - Right-click and select Update Field]"
         )
@@ -502,7 +517,10 @@ class DocxWriter:
 
         # Add bibliography heading
         # Uses Heading 1 style for consistent document structure
-        self.doc.add_paragraph(bib_section.heading, style="Heading 1")
+        bib_heading = self.doc.add_paragraph(bib_section.heading)
+        heading_style = self.style_resolver.resolve("heading_1")
+        if heading_style:
+            self.style_resolver.apply_paragraph_style(bib_heading, heading_style)
 
         # Get entries to write (sorted if AUTHOR_YEAR style)
         entries = bib_section.entries
@@ -515,7 +533,10 @@ class DocxWriter:
         for i, entry in enumerate(entries, start=1):
             # Format entry text based on citation style
             entry_text = self._format_bibliography_entry(entry, i, bib_section.style)
-            para = self.doc.add_paragraph(style="Normal")
+            para = self.doc.add_paragraph()
+            normal_style = self.style_resolver.resolve("normal")
+            if normal_style:
+                self.style_resolver.apply_paragraph_style(para, normal_style)
 
             # Apply hanging indent (1.25cm as per ГОСТ 7.32-2017)
             # First line indent is negative (hanging), rest is positive
@@ -947,7 +968,15 @@ class DocxWriter:
         if caption.text:
             formatted = f"{formatted} — {caption.text}"  # em-dash for GOST style
 
-        para = self.doc.add_paragraph(style="Caption")
+        para = self.doc.add_paragraph()
+        # Use different styles for figure and table captions
+        if caption.numbering_kind == NumberingKind.TABLE:
+            caption_ir_type = "caption_table"
+        else:
+            caption_ir_type = "caption_figure"
+        caption_style = self.style_resolver.resolve(caption_ir_type)
+        if caption_style:
+            self.style_resolver.apply_paragraph_style(para, caption_style)
         para.add_run(formatted)
 
     def _write_code_block(self, code_block: CodeBlockNode) -> None:
@@ -1030,10 +1059,6 @@ class DocxWriter:
             elif hasattr(node, "content"):
                 text_parts.append(self._nodes_to_text(node.content))
         return "".join(text_parts)
-
-    def _get_heading_style(self, level: int) -> str:
-        styles = {1: "Heading 1", 2: "Heading 2", 3: "Heading 3"}
-        return styles.get(level, "Heading 1")
 
     def validate_references(self, ir_document: IRDocument) -> ValidationResult:
         """Выполняет bidirectional валидацию ссылок и меток.
