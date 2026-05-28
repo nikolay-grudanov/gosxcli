@@ -1,8 +1,8 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-25 (v0.3.1 → Real thesis bug fixes complete)
-**Version:** v0.3.1 (Bug Fixes + Style Improvements)
-**Status:** В разработке — spec 005-template-integration Phase 2 ✅ (T001-T008 done, Phase 3-6 pending)
+**Last Updated:** 2026-05-29 (v0.4.0 → Spec 005 GOST Template Integration complete)
+**Version:** v0.4.0 (GOST Template Integration)
+**Status:** Spec 005-template-integration полностью реализован ✅ (Phase 1-6, T001-T024)
 
 ### Key Metrics
 - Lines of Code: ~5,800 (31 Python source files)
@@ -65,7 +65,7 @@
 
 ---
 
-## v0.3.1 — Bug Fixes + Style Improvements (uncommitted)
+## v0.3.1 — Bug Fixes + Style Improvements ✅
 
 ### Parser Bug Fixes ✅ (commit d68f209)
 1. **OMML rendering** — создан `writers/mml2omml.py` (MathML→OMML конвертер)
@@ -73,7 +73,7 @@
 3. **Table not parsed** — автоматически исправлен фиксом label
 4. **Ref colon support** — scanner поддерживает `@tbl:test`, `@eq:formula`
 
-### Style & Formatting Fixes ✅ (uncommitted)
+### Style & Formatting Fixes ✅ (commit b2355f7)
 5. **Font Normal** — Times New Roman 14pt через `_configure_styles()` + XML rFonts
 6. **Heading color** — чёрный вместо синего (RGBColor(0,0,0))
 7. **Heading font** — Times New Roman через XML rFonts для Heading 1-3
@@ -93,8 +93,45 @@
 - Проанализированы стили через python-docx и XML ✅
 - Создан план интеграции: `specs/005-template-integration/` ✅
 - **Критическое открытие:** Нестандартные style_id ('781','782','783') для Heading 1-3 — `doc.styles['Heading 1']` → KeyError
-- Решение: StyleResolver с итеративным fallback + кэширование
-- **Следующий шаг:** Реализация spec 005-template-integration (ветка `005-template-integration`)
+- Решение: StyleResolver с итеративным fallback + кэширование ✅
+
+---
+
+## v0.4.0 — GOST Template Integration (spec 005) ✅
+
+### Phase 1: Setup ✅ (T001-T003)
+- `src/typst_gost_docx/templates/` с встроенным ГОСТ шаблоном
+- `pyproject.toml` обновлён для включения `templates/*.docx`
+- Шаблон доступен через `importlib.resources`
+
+### Phase 2: Foundation ✅ (T004-T008)
+- `StyleResolver` с итеративным lookup + кэширование + fuzzy fallback
+- `load_document()` с fallback chain: custom → built-in → Document()
+- Monkeypatch `Styles.__getitem__` для обхода BabelFish bug с нестандартными style_id
+- `_configure_styles()` полностью удалён из DocxWriter
+- `initialize_fallback_styles()` для Document() fallback
+
+### Phase 3: Default GOST Template ✅ (T009-T013)
+- Все writer методы используют StyleResolver: `_write_section()`, `_write_paragraph()`, `_write_caption()`, `_write_toc()`, `_write_bibliography()`, `_write_list()`
+- Normal: Times New Roman 14pt из шаблона
+- Heading 1-3: чёрные, Times New Roman, наследование из шаблона
+
+### Phase 4: Custom Template Styles ✅ (T014-T018)
+- `_is_unnumbered_heading()`: ВВЕДЕНИЕ, ЗАКЛЮЧЕНИЕ → стиль `Заг_не_содержание`
+- Подписи рисунков → `Подпись рисунков`, таблиц → `Таблица название`
+- Формулы → стиль `Формулы`
+- Таблицы → `Table Grid` из шаблона
+
+### Phase 5: CLI Template Override ✅ (T019-T021)
+- `--reference-doc` для пользовательского шаблона
+- Template info в `_print_summary()` (path + source)
+- Fallback chain верифицирован: custom → built-in → Document()
+
+### Phase 6: Polish ✅ (T022-T024)
+- ruff check: ✅ All checks passed
+- mypy --strict: ✅ 0 errors in 32 files
+- pytest: ✅ 262 passed
+- E2E конвертация с шаблоном верифицирована
 
 ---
 
@@ -178,6 +215,7 @@
 | 002 | ✅ | ✅ | ✅ #1 | Вмержена |
 | 003 | ✅ | ❌ (работа в 002) | ✅ (в 002) | Вмержена через 002 |
 | 004 | ✅ | ✅ | ✅ #2 | Вмержена |
+| 005 | ✅ | ✅ | ✅ (pending) | В процессе мержа |
 
 **001 требует отдельной реализации** — spec есть, работа не начата.
 
@@ -203,33 +241,35 @@
 | 2026-05-24 | Non-standard style_id workaround | Heading 1-3 имеют style_id '781-783' вместо стандартных 'Heading1-3'; решается итеративным поиском |
 | 2026-05-24 | 005 Phase 2: StyleResolver + TemplateLoader | Monkeypatch Styles.__getitem__ для обхода BabelFish bug; _clear_document_body() для очистки контента шаблона; initialize_fallback_styles() для Document() fallback |
 | 2026-05-24 | 005 Phase 4: Custom Template Styles | Реализованы T014-T018: _is_unnumbered_heading(), обнаружение ненумерованных заголовков, раздельные стили caption_table/caption_figure, equation стиль, обработка KeyError для Table Grid |
+| 2026-05-29 | 005 Spec полностью завершён | Все Phase 1-6 реализованы (T001-T024). Удалён tmp-test/ мусор. StyleResolver + TemplateLoader работают. E2E верификация пройдена |
 
 ---
 
 ## Next Steps
 
-### ⏳ BLOCKING — Ожидание от пользователя → ✅ РЕШЕНО
+### ✅ Spec 005 — Полностью завершён
 - [x] **Пользователь предоставил шаблон** `Шаблон_оформления_ВКР_2026_новый.docx`
 - [x] Проанализировать стили через python-docx + XML
 - [x] Создать план интеграции (spec 005)
 - [x] Реализовать spec 005-template-integration Phase 1-2 (T001-T008)
-- [x] Реализовать spec 005 Phase 4: Custom Template Styles (T014-T018) ✅
-- [ ] Реализовать spec 005 Phase 3 (T009-T013)
-- [ ] Реализовать spec 005 Phase 5-6 (T019-T024)
-- [ ] Закоммитить все изменения
+- [x] Реализовать spec 005 Phase 3 (T009-T013)
+- [x] Реализовать spec 005 Phase 4 (T014-T018)
+- [x] Реализовать spec 005 Phase 5-6 (T019-T024)
+- [x] Очистка tmp-test/ и .gitignore
+- [x] Обновить state.md
 
-### Immediate (Uncommitted Changes)
-- [ ] Commit style/formatting fixes + image path resolution
-- [ ] Рассмотреть тег v0.3.1
+### Immediate
+- [ ] Создать PR для 005-template-integration → main
+- [ ] Рассмотреть тег v0.4.0
 
-### Short Term (v0.3.x)
+### Short Term (v0.4.x)
 1. Investigate XML double-escaping in _escape_xml_text
 2. Make latex2mathml/pygments optional dependencies
 3. Add tests for BookmarksManager, ImagesManager
 4. Clean up unused parser modules (typst_client, typst_query_parser, etc.)
 5. Deduplicate bibliography_style between Config and DocxWriter
 
-### Medium Term (v0.4)
+### Medium Term (v0.5)
 6. Implement spec 001 (Enhanced Academic Support)
 7. Real TOC field generation
 8. Full GOST 7.32-2017 compliance
@@ -247,4 +287,4 @@
 
 ---
 
-**Last Updated by:** @gosxcli-orchestrator (2026-05-24)
+**Last Updated by:** @gosxcli-orchestrator (2026-05-29)
