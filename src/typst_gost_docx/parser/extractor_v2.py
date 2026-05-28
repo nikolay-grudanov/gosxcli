@@ -53,7 +53,14 @@ class ParserState(Enum):
 class TypstExtractorV2:
     """State-machine based Typst extractor."""
 
-    def __init__(self, text: str, file_path: str):
+    def __init__(self, text: str, file_path: str, bib_keys: set[str] | None = None):
+        """Инициализирует экстрактор.
+
+        Args:
+            text: Текст Typst документа.
+            file_path: Путь к файлу для отладки.
+            bib_keys: Множество ключей библиографии для распознавания цитирований.
+        """
         self.text = text
         self.file_path = file_path
         self.scanner = TypstScanner(text)
@@ -61,9 +68,12 @@ class TypstExtractorV2:
         self.pos = 0
 
         self.state = ParserState.DOCUMENT
-        self.paren_stack: List[int] = []
-        self.bracket_stack: List[int] = []
+        self.paren_stack: list[int] = []
+        self.bracket_stack: list[int] = []
         self.current_label: Optional[str] = None
+
+        # Библиографические ключи для распознавания цитирований
+        self._bib_keys: set[str] = bib_keys if bib_keys else set()
 
         # Citation tracking
         self._citation_keys: dict[str, int] = {}  # key -> number
@@ -707,11 +717,14 @@ class TypstExtractorV2:
 
         self.pos += 1
 
-    def _extract_ref(self) -> Optional[CrossReference]:
-        """Extract reference from tokens.
+    def _extract_ref(self) -> Optional[InlineNode]:
+        """Extract reference or citation from tokens.
+
+        Checks if the reference key matches a known bibliography key.
+        If so, creates a CitationNode instead of CrossReference.
 
         Returns:
-            IR CrossReference or None
+            IR InlineNode (CitationNode or CrossReference) or None
         """
         token = self.tokens[self.pos]
         ref_match = token.value
@@ -719,6 +732,26 @@ class TypstExtractorV2:
         if ref_match.startswith("@"):
             target_label = ref_match[1:].strip()
 
+            # Проверяем, является ли это библиографическим цитированием
+            if target_label in self._bib_keys:
+                # Treat as citation
+                if target_label not in self._citation_keys:
+                    self._citation_keys[target_label] = len(self._citation_keys) + 1
+                    self._citation_order.append(target_label)
+
+                citation = CitationNode(
+                    node_type=NodeType.CITATION,
+                    id=str(uuid.uuid4()),
+                    key=target_label,
+                    number=self._citation_keys[target_label],
+                    source_location=SourceLocation(
+                        file_path=self.file_path, line=token.line, column=token.column
+                    ),
+                )
+                self.pos += 1
+                return citation
+
+            # Regular cross-reference
             ref = CrossReference(
                 node_type=NodeType.CROSS_REFERENCE,
                 id=str(uuid.uuid4()),

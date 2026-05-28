@@ -3,7 +3,6 @@
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class TypstProjectLoader:
@@ -18,6 +17,10 @@ class TypstProjectLoader:
 
     INCLUDE_PATTERN = re.compile(r'^[^/]*#include\s+["\']([^"\']+)["\']')
     """Регулярное выражение для поиска #include директив (игнорирует комментарии)."""
+
+    # Паттерны для поиска путей к изображениям
+    IMAGE_PATTERN = re.compile(r'image\s*\(\s*["\']([^"\']+)["\']')
+    """Регулярное выражение для поиска image("...") или image('...')."""
 
     def __init__(self, main_file: Path, strict_mode: bool = False):
         """Инициализирует загрузчик проекта.
@@ -44,8 +47,8 @@ class TypstProjectLoader:
             RecursionError: Если превышена максимальная глубина включений.
             ValueError: Если обнаружена циклическая ссылка.
         """
-        files = {}
-        loaded_files = set()  # Для отслеживания уже загруженных файлов
+        files: dict[str, str] = {}
+        loaded_files: set[str] = set()  # Для отслеживания уже загруженных файлов
 
         if not self.main_file.exists():
             raise FileNotFoundError(f"Main file not found: {self.main_file}")
@@ -148,7 +151,7 @@ class TypstProjectLoader:
         Returns:
             Список путей к включённым файлам.
         """
-        includes = []
+        includes: list[Path] = []
 
         for line in content.split("\n"):
             match = self.INCLUDE_PATTERN.match(line.strip())
@@ -158,7 +161,119 @@ class TypstProjectLoader:
 
         return includes
 
-    def get_asset_path(self, asset_name: str) -> Optional[Path]:
+    def resolve_includes(self, files: dict[str, str]) -> str:
+        """Заменяет #include директивы в главном файле на содержимое включённых файлов.
+
+        Рекурсивно обрабатывает вложенные #include, защищая от циклов.
+        Пропускает закомментированные строки (//).
+        После раскрытия всех #include удаляет неподдерживаемые Typst-директивы.
+
+        Args:
+            files: Словарь загруженных файлов (путь → содержимое).
+
+        Returns:
+            Объединённый текст со всеми #include раскрытыми.
+        """
+        processed_files: set[str] = set()
+        main_content = files.get(str(self.main_file), "")
+
+        result = self._resolve_includes_recursive(
+            content=main_content,
+            current_file=self.main_file,
+            files=files,
+            processed_files=processed_files,
+        )
+
+        return self._strip_unhandled_directives(result)
+
+    def _resolve_includes_recursive(
+        self,
+        content: str,
+        current_file: Path,
+        files: dict[str, str],
+        processed_files: set[str],
+        depth: int = 0,
+    ) -> str:
+        """Рекурсивно раскрывает #include директивы в содержимом файла.
+
+        Args:
+            content: Содержимое текущего файла.
+            current_file: Путь к текущему файлу.
+            files: Словарь загруженных файлов.
+            processed_files: Множество уже обработанных файлов.
+            depth: Текущая глубина рекурсии.
+
+        Returns:
+            Объединённый текст с раскрытыми #include.
+        """
+        if depth > self.MAX_INCLUDE_DEPTH:
+            self.logger.warning(
+                "Превышена максимальная глубина включений (%d) в %s",
+                self.MAX_INCLUDE_DEPTH,
+                current_file,
+            )
+            return content
+
+        resolved_path_str = str(current_file.resolve())
+        if resolved_path_str in processed_files:
+            self.logger.debug("Файл уже обработан: %s", resolved_path_str)
+            return content
+
+        processed_files.add(resolved_path_str)
+
+        # Разбиваем на строки и обрабатываем каждую
+        lines = content.split("\n")
+        resolved_lines: list[str] = []
+
+        for line in lines:
+            stripped = line.strip()
+            match = self.INCLUDE_PATTERN.match(stripped)
+
+            if match:
+                # Нашли #include директиву
+                include_path = Path(match.group(1))
+                # Разрешаем путь относительно текущего файла
+                resolved_include = (current_file.parent / include_path).resolve()
+                include_path_str = str(resolved_include)
+
+                # Проверяем, загружен ли файл
+                if include_path_str in files:
+                    # Проверяем на цикл
+                    if include_path_str in processed_files:
+                        self.logger.debug("Пропуск циклической ссылки: %s", include_path)
+                        continue
+
+                    # Получаем содержимое включённого файла
+                    included_content = files[include_path_str]
+
+                    # Рекурсивно обрабатываем включённый файл
+                    resolved_content = self._resolve_includes_recursive(
+                        content=included_content,
+                        current_file=resolved_include,
+                        files=files,
+                        processed_files=processed_files,
+                        depth=depth + 1,
+                    )
+
+                    # Переписываем пути к изображениям относительно корня проекта
+                    resolved_content = self._rewrite_image_paths(
+                        resolved_content, resolved_include, self.main_file
+                    )
+
+                    resolved_lines.append(resolved_content)
+                    self.logger.debug("Раскрыт include: %s -> %s", include_path, resolved_include)
+                else:
+                    # Файл не найден в словаре
+                    if self.strict_mode:
+                        self.logger.warning("Файл не найден: %s", resolved_include)
+                    resolved_lines.append(line)  # Оставляем оригинальную строку
+            else:
+                # Обычная строка, без #include
+                resolved_lines.append(line)
+
+        return "\n".join(resolved_lines)
+
+    def get_asset_path(self, asset_name: str) -> Path | None:
         """Разрешает путь к ресурсу относительно корня проекта.
 
         Args:
@@ -169,3 +284,117 @@ class TypstProjectLoader:
         """
         path = self.project_root / asset_name
         return path if path.exists() else None
+
+    def _rewrite_image_paths(self, content: str, included_file: Path, main_file: Path) -> str:
+        """Переписывает пути к изображениям относительно корня проекта.
+
+        Когда глава включена через #include из подкаталога (например, chapters/),
+        пути к изображениям вида "../diagrams/image.png" становятся некорректными
+        относительно основного файла. Этот метод разрешает их относительно
+        корня проекта (main_file.parent).
+
+        Args:
+            content: Содержимое включённого файла с путями к изображениям.
+            included_file: Путь к включённому файлу.
+            main_file: Путь к основному файлу проекта.
+
+        Returns:
+            Содержимое с переписанными путями к изображениям.
+        """
+        if "image(" not in content:
+            return content
+
+        # Папка корня проекта (где находится основной файл)
+        project_root = main_file.parent
+
+        # Функция для замены пути
+        def replace_path(match: re.Match[str]) -> str:
+            image_path_raw = match.group(1)
+
+            # Пропускаем абсолютные пути и URL
+            if image_path_raw.startswith("/") or image_path_raw.startswith("http"):
+                return match[0]
+
+            # Разрешаем путь относительно папки включённого файла
+            included_dir = included_file.parent
+            resolved_path = (included_dir / image_path_raw).resolve()
+
+            # Если resolved path находится в проекте, делаем его относительным
+            try:
+                # Пытаемся сделать относительно проекта
+                rel_path = resolved_path.relative_to(project_root)
+                # Формируем новый относительный путь
+                new_path_str = str(rel_path).replace("\\", "/")
+                return f'image("{new_path_str}"'
+            except ValueError:
+                # Путь вне проекта, используем как есть
+                self.logger.debug(
+                    "Изображение вне проекта: %s (resolved from %s)",
+                    resolved_path,
+                    image_path_raw,
+                )
+                # Возвращаем оригинальный текст (весь match)
+                matched_text = match.group(0)
+                return matched_text
+
+        # Находим и заменяем все image("...")
+        result = self.IMAGE_PATTERN.sub(replace_path, content)
+
+        return result
+
+    def _strip_unhandled_directives(self, content: str) -> str:
+        """Удаляет неподдерживаемые Typst-директивы из текста.
+
+        Удаляет #import, #show, #set, #outline директивы и // комментарии,
+        которые не могут быть обработаны парсером и утекают как plain text в DOCX.
+
+        Args:
+            content: Текст с раскрытыми #include директивами.
+
+        Returns:
+            Текст с удалёнными неподдерживаемыми директивами.
+        """
+        lines = content.split("\n")
+        result_lines: list[str] = []
+        skip_until_balanced = False
+        paren_depth = 0
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Если мы внутри многострочного блока директивы, отслеживаем скобки
+            if skip_until_balanced:
+                paren_depth += stripped.count("(") - stripped.count(")")
+                if paren_depth <= 0:
+                    skip_until_balanced = False
+                continue
+
+            # Пропускаем строчные комментарии //
+            if stripped.startswith("//"):
+                continue
+
+            # Пропускаем #import строки
+            if stripped.startswith("#import"):
+                continue
+
+            # Пропускаем #set строки
+            if stripped.startswith("#set"):
+                continue
+
+            # Пропускаем #outline строки (одно- или многострочные)
+            if stripped.startswith("#outline"):
+                paren_depth = stripped.count("(") - stripped.count(")")
+                if paren_depth > 0:
+                    skip_until_balanced = True
+                continue
+
+            # Пропускаем #show строки (одно- или многострочные с #show: ...)
+            if stripped.startswith("#show"):
+                paren_depth = stripped.count("(") - stripped.count(")")
+                if paren_depth > 0:
+                    skip_until_balanced = True
+                continue
+
+            result_lines.append(line)
+
+        return "\n".join(result_lines)

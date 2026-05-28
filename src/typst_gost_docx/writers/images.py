@@ -21,7 +21,9 @@ class ImagesManager:
         if not path.is_absolute() and self.base_dir:
             path = self.base_dir / path
         if not path.exists():
-            logging.getLogger("typst_gost_docx").warning(f"Image not found: {image_path} (resolved: {path})")
+            logging.getLogger("typst_gost_docx").warning(
+                f"Image not found: {image_path} (resolved: {path})"
+            )
             return
 
         if width is None:
