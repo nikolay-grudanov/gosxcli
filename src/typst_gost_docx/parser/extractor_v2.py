@@ -882,6 +882,9 @@ class TypstExtractorV2:
                 node_type=NodeType.CROSS_REFERENCE,
                 id=str(uuid.uuid4()),
                 target_label=target_label,
+                source_location=SourceLocation(
+                    file_path=self.file_path, line=token.line, column=token.column
+                ),
             )
 
             self.pos += 1

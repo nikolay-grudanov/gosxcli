@@ -155,10 +155,10 @@ def _run_conversion(config: Config) -> dict[str, Any]:
 
     ChapterNumberer().number_document(ir_document)
     resolver = RefResolver()
-    unresolved_warnings = resolver.resolve_document(ir_document)
-    if unresolved_warnings:
-        for w in unresolved_warnings:
-            logger.warning("Unresolved reference: %s", w)
+    resolver.resolve_document(ir_document)
+    # Unresolved references are reported by ``writer.validate_references``
+    # which logs each issue with its source location — no need to duplicate
+    # the warning here.
 
     # Dump IR если нужно
     if config.dump_ir or config.dump_json:

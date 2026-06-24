@@ -18,9 +18,11 @@ from ..ir.model import (
     Document,
     Paragraph,
     Section,
+    ValidationIssue,
+    ValidationResult,
 )
+from ..ir.validator import ISSUE_UNDEFINED_REF
 from ..utils.ref_utils import infer_ref_kind
-
 
 _REF_TEXT_TEMPLATES: dict[str, str] = {
     "fig": "Рис. {chapter}.{number}",
@@ -152,3 +154,48 @@ class RefResolver:
                 chapter = getattr(caption, "chapter_number", 0) or 0
                 number = getattr(caption, "number", 0) or 0
         return chapter, number
+
+    @staticmethod
+    def build_validation_report(
+        document: Document,
+        unresolved_warnings: Sequence[str],
+    ) -> ValidationResult:
+        """Build a ValidationResult from the resolver's collected state.
+
+        ``unresolved_warnings`` is the list of ``"Unresolved reference: @x"``
+        strings returned by :meth:`resolve_document`. The function lifts
+        them back into structured ``ValidationIssue`` entries with the
+        file location of the offending cross-reference.
+
+        Spec 001 T088: dedicated report generator living next to the
+        resolver that produced the data, so the CLI can render
+        actionable messages without re-walking the IR.
+        """
+        issues: list[ValidationIssue] = []
+
+        for warning in unresolved_warnings:
+            # "Unresolved reference: @fig:missing" → "fig:missing"
+            label = warning.split("@", 1)[-1].strip() if "@" in warning else warning
+            location = RefResolver._find_reference_location(document, label)
+            issues.append(
+                ValidationIssue(
+                    label=label,
+                    kind=ISSUE_UNDEFINED_REF,
+                    file_path=getattr(location, "file_path", "") or "",
+                    line=getattr(location, "line", 0) or 0,
+                    column=getattr(location, "column", 0) or 0,
+                )
+            )
+
+        return ValidationResult(
+            undefined_refs={i.label for i in issues},
+            issues=issues,
+        )
+
+    @staticmethod
+    def _find_reference_location(document: Document, target_label: str) -> object | None:
+        """Return the first ``SourceLocation`` where ``@target_label`` appears."""
+        for node in RefResolver._walk(document):
+            if isinstance(node, CrossReference) and node.target_label == target_label:
+                return getattr(node, "source_location", None)
+        return None
