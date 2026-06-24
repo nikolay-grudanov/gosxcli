@@ -49,3 +49,8 @@ uv.lock
 
 # Temporary test artifacts
 tmp-test/
+
+# Benchmark results — generated on every `pytest benchmarks/` run,
+# not source-controlled. Use `python benchmarks/compare.py` to read.
+benchmarks/results/
+
