@@ -1,57 +1,88 @@
-"""Tests for labels and references."""
+"""Tests for labels and references.
 
-from typst_gost_docx.parser.labels import LabelExtractor
-from typst_gost_docx.parser.refs import RefResolver
+Migrated from a flat regex-based ``LabelExtractor`` to the canonical
+``TypstExtractorV2`` + ``RefResolver`` pipeline. The flat extractor
+was retired along with ``parser/labels.py`` (see v0.5.0 cleanup) and
+its tests now go through the same code path the CLI uses.
+"""
+
 from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
+from typst_gost_docx.parser.numbering import ChapterNumberer
+from typst_gost_docx.parser.refs import RefResolver
 
 
-def test_label_extraction():
+def _parse_number_resolve(text: str):
+    """Run extract → number → resolve so tests don't repeat the boilerplate."""
+    doc = TypstExtractorV2(text, "test.typ").extract()
+    ChapterNumberer().number_document(doc)
+    RefResolver().resolve_document(doc)
+    return doc
+
+
+def test_label_in_document_is_collected():
+    """A labeled node (``<fig:results>``) must appear in the IR."""
     text = """
-This is a paragraph with a label <fig:results>.
+= Intro
 
-Another label <table:data>.
+Some paragraph.
+
+#figure(image("plot.png"), caption: [Results]) <fig:results>
 """
-    extractor = LabelExtractor("test.typ")
-    nodes = extractor.extract_labels_and_refs(text)
+    doc = TypstExtractorV2(text, "test.typ").extract()
 
-    labels = [n for n in nodes if n.node_type == "bookmark"]
-    assert len(labels) == 2
-    assert labels[0].name == "fig:results"
-    assert labels[1].name == "table:data"
+    figures = [b for b in doc.blocks if b.node_type == "figure"]
+    assert len(figures) == 1
+    assert figures[0].label == "fig:results"
 
 
-def test_ref_extraction():
+def test_multiple_labels_in_document():
+    """Several labeled nodes must each carry their own label."""
     text = """
-As shown in @fig:results and @table:data, the system works.
+= Intro
 
-See also @equation:energy.
+#figure(image("a.png"), caption: [A]) <fig:a>
+#figure(image("b.png"), caption: [B]) <fig:b>
 """
-    extractor = LabelExtractor("test.typ")
-    nodes = extractor.extract_labels_and_refs(text)
+    doc = TypstExtractorV2(text, "test.typ").extract()
 
-    refs = [n for n in nodes if n.node_type == "cross_reference"]
-    assert len(refs) == 3
-    assert refs[0].target_label == "fig:results"
-    assert refs[1].target_label == "table:data"
-    assert refs[2].target_label == "equation:energy"
+    figures = [b for b in doc.blocks if b.node_type == "figure"]
+    labels = sorted(f.label for f in figures)
+    assert labels == ["fig:a", "fig:b"]
 
 
-def test_ref_resolution():
-    text = """Some text @fig:results here."""
+def test_unresolved_reference_is_reported():
+    """An ``@fig:missing`` reference with no corresponding label must be reported."""
+    text = """
+= Intro
 
-    label_extractor = LabelExtractor("test.typ")
-    label_extractor.extract_labels_and_refs(text)
+As shown in @fig:missing, the system works.
+"""
+    doc = _parse_number_resolve(text)
 
-    ref_resolver = RefResolver(label_extractor.get_cross_ref_map())
-
-    test_nodes = [
-        n for n in label_extractor.extract_labels_and_refs(text) if n.node_type == "cross_reference"
-    ]
-
-    warnings = ref_resolver.resolve_refs(test_nodes)
-
+    warnings = RefResolver().resolve_document(doc)
     assert len(warnings) == 1
-    assert "Unresolved reference" in warnings[0]
+    assert "@fig:missing" in warnings[0]
+
+
+def test_resolved_reference_carries_ref_text():
+    """When the target exists, the resolver fills ``ref_text`` with the visible string."""
+    text = """
+= Intro
+
+#figure(image("plot.png"), caption: [Results]) <fig:results>
+
+As shown in @fig:results.
+"""
+    doc = _parse_number_resolve(text)
+
+    # Find the inline CrossReference
+    for block in doc.blocks:
+        if hasattr(block, "runs"):
+            for run in block.runs:
+                if getattr(run, "target_label", None) == "fig:results":
+                    assert run.ref_text == "Рис. 1.1"
+                    return
+    raise AssertionError("CrossReference to fig:results not found in IR")
 
 
 def test_figure_with_label():
@@ -62,7 +93,6 @@ def test_figure_with_label():
 ) <fig:results>
 """
     extractor = TypstExtractorV2(text, "test.typ")
-
     doc = extractor.extract()
 
     figures = [b for b in doc.blocks if b.node_type == "figure"]
@@ -79,7 +109,6 @@ def test_table_with_label():
 ) <table:data>
 """
     extractor = TypstExtractorV2(text, "test.typ")
-
     doc = extractor.extract()
 
     tables = [b for b in doc.blocks if b.node_type == "table"]

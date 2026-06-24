@@ -231,7 +231,6 @@ typst-gost-docx convert thesis.typ -o thesis.docx --debug --dump-ir
 Открытые проблемы (полный список — в `state.md`):
 - **P1:** Python 3.14 не тестировался (проект requires >=3.12)
 - **P2:** Нет тестов для `BookmarksManager`, `ImagesManager`
-- **P2:** 5 неиспользуемых parser-модулей (`typst_client`, `typst_query_parser`, `unified_parser`, `regex_fallback_parser`, `labels`)
 - **P2:** TOC — placeholder, не реальный Word field
 - **P2:** XML double-escaping риск в `_escape_xml_text`
 - **P2:** `latex2mathml`, `pygments` обязательные зависимости (лучше optional)

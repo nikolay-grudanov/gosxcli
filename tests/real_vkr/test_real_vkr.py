@@ -3,7 +3,6 @@
 from pathlib import Path
 from typst_gost_docx.ingest.project_loader import TypstProjectLoader
 from typst_gost_docx.parser.extractor_v2 import TypstExtractorV2
-from typst_gost_docx.parser.labels import LabelExtractor
 
 
 def test_vvedenie_headings():
@@ -22,15 +21,33 @@ def test_vvedenie_headings():
 
 
 def test_vvedenie_references():
-    """Test reference extraction from real VKR introduction."""
+    """Test reference extraction from real VKR introduction.
+
+    Uses the canonical ``TypstExtractorV2`` + ``RefResolver`` pipeline
+    that the CLI uses, instead of the retired ``LabelExtractor`` regex
+    parser. References appear as ``CrossReference`` IR nodes nested in
+    paragraph ``runs``.
+    """
+    from typst_gost_docx.parser.refs import RefResolver
+
     vvedenie_path = Path("fixtures/real_vkr/main_doc/chapters/00-vvedenie.typ")
     loader = TypstProjectLoader(vvedenie_path)
     files = loader.load()
 
-    label_extractor = LabelExtractor(str(vvedenie_path))
-    nodes = label_extractor.extract_labels_and_refs(files[str(vvedenie_path)])
+    doc = TypstExtractorV2(files[str(vvedenie_path)], str(vvedenie_path)).extract()
+    RefResolver().resolve_document(doc)
 
-    refs = [n for n in nodes if n.node_type == "cross_reference"]
+    # Walk the IR looking for CrossReference nodes anywhere.
+    def _walk(node):
+        yield node
+        if hasattr(node, "blocks") and node.blocks:
+            for b in node.blocks:
+                yield from _walk(b)
+        if hasattr(node, "runs") and node.runs:
+            for r in node.runs:
+                yield from _walk(r)
+
+    refs = [n for n in _walk(doc) if n.__class__.__name__ == "CrossReference"]
     assert len(refs) > 10
 
 
@@ -83,15 +100,23 @@ def test_literature_review_figures():
 
 
 def test_literature_review_labels():
-    """Test label extraction from literature review."""
+    """Test label extraction from literature review.
+
+    Migrated to ``TypstExtractorV2`` (was ``LabelExtractor``, retired
+    along with ``parser/labels.py``). Labels live on IR nodes as
+    ``Figure.label`` / ``TableNode.label`` / ``Equation.label``.
+    """
     lit_review_path = Path("fixtures/real_vkr/main_doc/chapters/01-literature-review.typ")
     loader = TypstProjectLoader(lit_review_path)
     files = loader.load()
 
-    label_extractor = LabelExtractor(str(lit_review_path))
-    nodes = label_extractor.extract_labels_and_refs(files[str(lit_review_path)])
+    doc = TypstExtractorV2(files[str(lit_review_path)], str(lit_review_path)).extract()
 
-    labels = [n for n in nodes if n.node_type == "bookmark"]
+    labels: list[str] = []
+    for block in doc.blocks:
+        label = getattr(block, "label", None)
+        if label:
+            labels.append(label)
     assert len(labels) >= 2
 
 

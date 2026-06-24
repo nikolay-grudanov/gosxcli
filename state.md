@@ -296,13 +296,14 @@
 - [x] T109-T113, T120: README, state.md, version bump
 - [x] Push 4 commits (984aac6, 2b25a1b, 5b2faeb, 6a0d002) → origin/001-enhanced-academic-support
 - [ ] Open PR → main
+- [x] **Dead-code cleanup:** removed 5 unused parser modules (parser/unified_parser.py, parser/typst_query_parser.py, parser/regex_fallback_parser.py, parser/labels.py, ingest/typst_client.py). Migrated `tests/test_refs.py` and `tests/real_vkr/test_real_vkr.py` to use the canonical `TypstExtractorV2` + `RefResolver` pipeline.
 
 ### Immediate
 - [ ] Open PR for 001-enhanced-academic-support → main
 - [ ] Consider git tag v0.5.0 after PR merge
 
 ### Short Term (v0.5.x)
-1. Remove 5 dead parser modules (typst_client, typst_query_parser, unified_parser, regex_fallback_parser, labels)
+1. ~~Remove 5 dead parser modules (typst_client, typst_query_parser, unified_parser, regex_fallback_parser, labels)~~ ✅ done in v0.5.0 cleanup
 2. Make `latex2mathml`, `pygments` optional dependencies
 3. Add tests for `BookmarksManager`, `ImagesManager`
 4. Investigate XML double-escaping risk in `_escape_xml_text`
