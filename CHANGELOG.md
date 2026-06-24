@@ -5,11 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - 2026-04-20
+## [0.4.0] - 2026-05-29
 
-### 🎉 Code Blocks Support MVP
+### 🎉 GOST Template Integration (spec 005)
 
-This release adds basic code blocks support with monospace font, XML escaping, and background shading.
+Интеграция референсного ГОСТ 7.32-2017 шаблона как встроенного шаблона по умолчанию и поддержка пользовательских шаблонов через `--reference-doc`.
+
+### ✨ New Features
+
+#### Встроенный ГОСТ-шаблон
+- Бандл `templates/*.docx` (Шаблон_оформления_ВКР_2026_новый.docx) — Times New Roman 14pt, чёрные заголовки
+- `pyproject.toml` включает `templates/*.docx` через `package-data`
+- Шаблон доступен через `importlib.resources` без внешних файлов
+
+#### StyleResolver с итеративным fallback
+- Итеративный lookup по стилям + кэширование
+- Fuzzy fallback для нестандартных `style_id` (Heading 1 → "781" в шаблоне ВКР)
+- Обход `python-docx` BabelFish bug с нестандартными ID через monkeypatch `Styles.__getitem__`
+
+#### Template fallback chain
+- `load_document()`: `--reference-doc` (custom) → встроенный ГОСТ → `Document()` fallback
+- `_configure_styles()` полностью удалён из `DocxWriter` (больше не нужен)
+- `initialize_fallback_styles()` для случая fallback на `Document()`
+
+#### Специальные стили шаблона
+- `_is_unnumbered_heading()`: ВВЕДЕНИЕ / ЗАКЛЮЧЕНИЕ → стиль `Заг_не_содержание`
+- Подписи рисунков → стиль `Подпись рисунков`
+- Подписи таблиц → стиль `Таблица название`
+- Формулы → стиль `Формулы`
+- Таблицы → `Table Grid` из шаблона (с обработкой KeyError)
+
+#### CLI: `--reference-doc`
+- Пользовательский шаблон через CLI-флаг
+- Template info (path + source) в `_print_summary()`
+
+### 🔧 Verification
+
+- ruff check: ✅ All checks passed
+- mypy --strict: ✅ 0 errors in 32 files
+- pytest: ✅ 262 passed
+- E2E конвертация с шаблоном верифицирована
+
+### 📊 Metrics
+
+| Metric | Value |
+|--------|-------|
+| Lines of Code | ~5,800 |
+| Source Files | 31 |
+| Test Files | 29 |
+| Test Cases | 262 |
+
+## [0.3.1] - 2026-05-12
+
+### 🐛 Bug Fixes
+
+#### Parser
+1. **OMML rendering** — MathML → OMML конвертер (`writers/mml2omml.py`)
+2. **Label misattribution** — whitespace token skipping перед LABEL check
+3. **Table not parsed** — автоматически исправлен фиксом label
+4. **Ref colon support** — scanner поддерживает `@tbl:test`, `@eq:formula`
+
+#### Style & Formatting
+5. **Font Normal** — Times New Roman 14pt через `_configure_styles()` + XML rFonts
+6. **Heading color** — чёрный вместо синего (`RGBColor(0,0,0)`)
+7. **Heading font** — Times New Roman через XML rFonts для Heading 1-3
+8. **Heading numbering** — иерархическая нумерация (1, 1.1, 1.1.1) через `heading_counters`
+9. **Inline math** — `_write_text_with_inline_math()` для `$...$` внутри текста
+10. **Cross-reference resolution** — `label_number_map` для номеров фигур/таблиц/формул
+11. **Image path resolution** — `base_dir` в `ImagesManager`, резолвинг относительно `input_file.parent`
+12. **Test image** — `fixtures/minimal/test.png` (200×100 PNG)
+
+#### Real Thesis Fixes
+13. **Image path resolution for chapters** — `_rewrite_image_paths()` в `project_loader.py`
+14. **Bibliography citation recognition** — параметр `bib_keys` в `TypstExtractorV2` для отличия цитирований `@key` от cross-refs
+15. **Missing styles fallback** — `_create_fallback_style()` в `StyleResolver` для динамического создания List Bullet / List Number / Heading N при отсутствии в шаблоне
+
+## [0.3.0] - 2026-05-12
+
+### ✨ Syntax Highlighting
+
+- Pygments-based syntax highlighting for code blocks
+- VS Code Dark+ color scheme
+- Support for Python, Rust, JavaScript, C, C++, Go
+- Colored keywords, strings, comments, numbers, functions
+- Dark background (#1E1E1E) for code blocks
+- Monospace font (Courier New, 9pt)
+
+## [0.2.1] - 2026-05-12
+
+### 🎉 Feature Complete - Code Blocks & Testing
+
+This release adds code blocks support, E2E testing, benchmarks, and critical bug fixes.
 
 ### ✨ New Features
 
@@ -21,30 +107,59 @@ This release adds basic code blocks support with monospace font, XML escaping, a
 - Preserved indentation and line breaks
 - Small font size (9pt) for code blocks
 - CodeBlockNode IR model with content, language, and source location
-- Unit tests (14 tests) for CodeBlockNode model and extraction
-- Integration tests (8 tests) for code block rendering
+
+#### E2E Structure Tests
+- DOCX structure validation (headings, paragraphs, tables, figures)
+- Schema validation for document integrity
+- Test fixtures with real documents for E2E testing
+- Test helpers for extracting document elements
+
+#### Regression Testing Framework
+- Golden file comparison for output validation
+- Snapshot testing for IR documents
+- Test isolation with proper fixture management
+
+#### Performance Benchmarking
+- pytest-benchmark integration
+- Benchmark fixtures for conversion speed
+- Performance regression detection
 
 ### 📝 Documentation
 
 - Added Code Blocks section to README.md
 - Documented supported languages (Python, Rust, JavaScript, C, C++, plain text)
 - Added code examples for code blocks
-- Updated state.md with Code Blocks Support (Phase 5 completed)
+- Updated state.md with Code Blocks Support
+
+### 🐛 Bug Fixes
+
+- Fixed mypy --strict violations in:
+  - `parsers/extractor_v2.py`: missing return types
+  - `ir/model.py`: pydantic model issues
+  - `utils/paths.py`: type annotations
+- Fixed architecture boundary violation in labels.py (imported Document from writers)
+- Fixed bibliography entry validation errors
+- Fixed table cell content alignment issues
+- Fixed reference resolution for nested structures
+- Fixed math fallback rendering for complex formulas
+- Fixed bibliography key parsing for special characters
 
 ### 🔧 Maintenance
 
-- All 197 tests passing (175 existing + 22 code blocks tests)
+- All tests passing (175 existing + 22 code blocks tests)
 - 0 Ruff errors
-- Mypy --strict for new code blocks code (extractor_v2.py)
-- Comprehensive inline comments in _write_code_block() and _extract_code_block()
+- Mypy --strict compliance verified
+- Comprehensive inline comments added
+- Type hints verified for all public functions
 
 ### 📊 Metrics
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~4,750 (+280 code blocks) |
-| Test Files | 19 (added test_code_blocks.py) |
-| Test Cases | 197 (+22 code blocks tests) |
+| Lines of Code | ~4,750 |
+| Test Files | 19 |
+| Test Cases | 197 |
+| Ruff Errors | 0 |
 
 ## [0.2.0] - 2026-04-20
 

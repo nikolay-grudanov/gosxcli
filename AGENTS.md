@@ -4,13 +4,22 @@
 
 **Typst GOST DOCX Converter (gosxcli)** — CLI инструмент для конвертации Typst документов в DOCX с поддержкой стилизации по ГОСТ 7.32-2017. Проект предназначен для академических документов, диссертаций и научных работ.
 
-**Status:** MVP v0.1
+**Status:** v0.4.0 (GOST Template Integration) — 262 tests passing, 0 ruff/mypy errors
 
 **Tech Stack:** Python 3.12+, Typer, Pydantic v2, python-docx, lxml, Rich
 
 **Constitution:** [.specify/memory/constitution.md](.specify/memory/constitution.md) — принципы проекта, IR-контракт, правила работы агентов
 
 **Project State:** [state.md](state.md) — текущий статус, прогресс, известные проблемы (ОБЯЗАТЕЛЬНО читать перед работой и обновлять после)
+
+### ✅ RESOLVED (v0.4.0): Референсный документ интегрирован
+**Шаблон получен и интегрирован:** `template/Шаблон_оформления_ВКР_2026_новый.docx`
+
+Все 6 фаз спеки 005-template-integration завершены (T001-T024):
+1. ✅ Стили проанализированы через python-docx + XML
+2. ✅ `_configure_styles()` удалён из `docx_writer.py`
+3. ✅ Шаблон подключён через `Document(reference_doc)` со встроенным ГОСТ-шаблоном как default
+4. ✅ Конвертация верифицирована через E2E тесты (262 passing)
 
 ---
 
@@ -217,9 +226,21 @@ typst-gost-docx convert thesis.typ -o thesis.docx --debug --dump-ir
 
 ---
 
-## GOST Standards
+## Known Issues
 
-### ГОСТ 7.32-2017 Requirements
+Открытые проблемы (полный список — в `state.md`):
+- **P1:** Python 3.14 не тестировался (проект requires >=3.12)
+- **P2:** Нет тестов для `BookmarksManager`, `ImagesManager`
+- **P2:** 5 неиспользуемых parser-модулей (`typst_client`, `typst_query_parser`, `unified_parser`, `regex_fallback_parser`, `labels`)
+- **P2:** TOC — placeholder, не реальный Word field
+- **P2:** XML double-escaping риск в `_escape_xml_text`
+- **P2:** `latex2mathml`, `pygments` обязательные зависимости (лучше optional)
+
+---
+
+## GOST Standards (ГОСТ 7.32-2017)
+
+### Требования ГОСТ 7.32-2017
 
 Проект стремится к соответствию ГОСТ 7.32-2017 для академических документов:
 
@@ -228,18 +249,20 @@ typst-gost-docx convert thesis.typ -o thesis.docx --debug --dump-ir
 - Ссылки на литературные источники
 - Оформление таблиц, иллюстраций, приложений
 
-### Current Implementation (MVP)
+### Реализация в v0.4.0
 
 Базовая поддержка GOST:
-- Стилизация заголовков
+- Стилизация заголовков (Times New Roman, чёрные, иерархическая нумерация)
 - Форматирование списков
-- Подписи к рисункам и таблицам
-- Нумерация страниц (базовая)
+- Подписи к рисункам и таблицам (стили `Подпись рисунков`, `Таблица название`)
+- Нумерация страниц
+- Встроенный ГОСТ-шаблон (`templates/*.docx`) + `--reference-doc` для кастомного
+- Стиль `Заг_не_содержание` для ВВЕДЕНИЕ / ЗАКЛЮЧЕНИЕ
+- Стиль `Формулы` для формул
 
-**Planned (v0.2-v0.3):**
-- Полная реализация GOST 7.32-2017
-- Автоматическая генерация оглавления
-- Сноски и библиография
+**Planned (v0.5+):**
+- Реальный TOC field вместо placeholder
+- Полная автоматическая генерация оглавления
 
 ---
 

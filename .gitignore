@@ -36,3 +36,16 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+# Graphify output
+graphify-out/
+
+# uv lockfile (project uses requirements)
+uv.lock
+
+# Temporary test artifacts
+tmp-test/

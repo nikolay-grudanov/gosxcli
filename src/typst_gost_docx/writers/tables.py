@@ -61,7 +61,10 @@ class TablesManager:
 
         # Create table
         word_table = doc.add_table(rows=num_rows, cols=num_cols)
-        word_table.style = "Table Grid"
+        try:
+            word_table.style = "Table Grid"
+        except KeyError:
+            logger.warning("Table Grid style not found in template, using default table style")
 
         # Set column widths from ColSpec
         self._set_table_grid(word_table, table.columns, num_cols)

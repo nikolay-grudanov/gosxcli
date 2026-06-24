@@ -48,10 +48,11 @@ $$
 == Изображения
 
 #figure(
-  caption: [Пример структуры],
-) <fig:structure>
+  image("assets/ums_panel.jpg", width: 90%),
+  caption: [Панель моделирования городской мобильности (UMS) — сетка 20×20 с агентами в режиме rulebased],
+) <fig:ums_panel>
 
-Структура показана на рисунке @fig:structure.
+Структура показана на рисунке @fig:ums_panel.
 
 == Заключение
 

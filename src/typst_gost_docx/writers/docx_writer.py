@@ -3,11 +3,11 @@
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from docx import Document
 from docx.document import Document as _Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches
+from docx.text.paragraph import Paragraph as DocxParagraph
 from ..ir.model import (
     Document as IRDocument,
     BaseNode,
@@ -27,19 +27,21 @@ from ..ir.model import (
     TextRun,
     InlineRunNode,
     InlineCodeNode,
+    InlineMathNode,
     CodeBlockNode,
     NumberingKind,
-    ListKind,
     CitationStyle,
     ChapterContext,
     ValidationResult,
 )
 from ..config import MathMode, RefLabels
 from ..ir.validator import ReferenceValidator
+from ..utils.ref_utils import infer_ref_kind
 from .bookmarks import BookmarksManager
-from .styles import StylesManager
 from .images import ImagesManager
 from .tables import TablesManager
+from .styles import StyleResolver, load_document, is_unnumbered_heading
+from .code_highlighter import highlight_code, is_supported_language
 
 
 class DocxWriter:
@@ -49,6 +51,7 @@ class DocxWriter:
         math_mode: MathMode = MathMode.FALLBACK,
         ref_labels: Optional[RefLabels] = None,
         bibliography_style: CitationStyle = CitationStyle.NUMERIC,
+        base_dir: Optional[Path] = None,
     ):
         """Инициализирует DOCX writer.
 
@@ -57,6 +60,7 @@ class DocxWriter:
             math_mode: Режим рендеринга математических выражений.
             ref_labels: Локализованные метки для ссылок.
             bibliography_style: Стиль цитирования (numeric или author-year).
+            base_dir: Базовая директория для резолвинга относительных путей (изображения и т.д.).
         """
         self.reference_doc = reference_doc
         self.math_mode = math_mode
@@ -64,11 +68,15 @@ class DocxWriter:
         self.entry_lookup: dict[str, BibliographyEntry] = {}
         self.doc: Optional[_Document] = None
         self.bookmarks_manager = BookmarksManager()
-        self.styles_manager = StylesManager()
-        self.images_manager = ImagesManager()
+        self.images_manager = ImagesManager(base_dir=base_dir)
         self.tables_manager = TablesManager()
+        from .lists import ListsManager
+
+        self.lists_manager: Optional[ListsManager] = None
         self.chapter_context = ChapterContext()
         self.ref_labels = ref_labels or RefLabels()
+        self.label_number_map: dict[str, tuple[int, int]] = {}  # label → (chapter_number, number)
+        self._style_resolver: Optional[StyleResolver] = None
 
         self.stats = {
             "headings": 0,
@@ -81,18 +89,53 @@ class DocxWriter:
             "warnings": 0,
         }
 
-    def write(self, ir_document: IRDocument, output_path: Path) -> dict[str, Any]:
-        if self.reference_doc and self.reference_doc.exists():
-            self.doc = Document(str(self.reference_doc))
-        else:
-            self.doc = Document()
+    @property
+    def style_resolver(self) -> StyleResolver:
+        """Lazy initialize StyleResolver for backward compatibility with tests."""
+        if self._style_resolver is None:
+            if self.doc is None:
+                self.doc = load_document(self.reference_doc)
+            self._style_resolver = StyleResolver(self.doc)
+        assert self._style_resolver is not None
+        return self._style_resolver
 
-        assert self.doc is not None, "Document not initialized"
+    @style_resolver.setter
+    def style_resolver(self, value: Optional[StyleResolver]) -> None:
+        self._style_resolver = value
+
+    def _is_unnumbered_heading(self, text: str) -> bool:
+        """Проверяет, является ли заголовок ненумерованным (ВВЕДЕНИЕ, ЗАКЛЮЧЕНИЕ и т.д.).
+
+        Args:
+            text: Текст заголовка для проверки.
+
+        Returns:
+            True если текст содержит ключевое слово ненумерованного заголовка.
+        """
+        return is_unnumbered_heading(text)
+
+    def write(self, ir_document: IRDocument, output_path: Path) -> dict[str, Any]:
+        self.doc = load_document(self.reference_doc)
+        self.style_resolver = StyleResolver(self.doc)
+        from .lists import ListsManager  # lazy: avoid circular import
+
+        self.lists_manager = ListsManager(self.doc)
 
         self._write_document(ir_document)
 
         self.doc.save(str(output_path))
         return self.stats
+
+    def _infer_ref_kind(self, label: str) -> Optional[str]:
+        """Инферирует тип ссылки по префиксу метки.
+
+        Args:
+            label: Метка ссылки (например, fig:results).
+
+        Returns:
+            Тип ссылки (fig, tbl, eq) или None.
+        """
+        return infer_ref_kind(label)
 
     def _write_document(self, ir_doc: IRDocument) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -125,6 +168,10 @@ class DocxWriter:
         assert self.doc is not None, "Document not initialized"
         self.stats["headings"] += 1
 
+        # Get title text early to detect unnumbered headings
+        title_text = self._nodes_to_text(section.title) if section.title else ""
+        is_unnumbered = self._is_unnumbered_heading(title_text) if title_text else False
+
         # Chapter-aware numbering: increment chapter on level 1 sections
         if section.level == 1:
             # Store current chapter number in the section
@@ -135,31 +182,107 @@ class DocxWriter:
             self.chapter_context.figure_counter = 0
             self.chapter_context.table_counter = 0
             self.chapter_context.equation_counter = 0
+            # Reset heading counters for new chapter
+            self.chapter_context.heading_counters = [0, 0, 0]
         else:
             # Non-level-1 sections use current chapter number
             section.chapter_number = self.chapter_context.chapter_number
 
         section.number = self.chapter_context.section_counter
 
-        style_name = self._get_heading_style(section.level)
+        if is_unnumbered:
+            # Unnumbered headings: no number prefix, use special style
+            number_str = ""
+            heading_ir_type = "heading_unnumbered"
+        else:
+            # Issue 3: Sequential hierarchical heading numbering
+            level_idx = section.level - 1  # 0-based index
+            if 0 <= level_idx < 3:
+                # Increment heading counter for this level
+                self.chapter_context.heading_counters[level_idx] += 1
+                # Reset all lower-level counters
+                for i in range(level_idx + 1, 3):
+                    self.chapter_context.heading_counters[i] = 0
+
+                # Build number string: "1" for level 1, "1.1" for level 2, "1.1.1" for level 3
+                nums = self.chapter_context.heading_counters[: level_idx + 1]
+                number_str = ".".join(str(n) for n in nums)
+            else:
+                number_str = ""
+
+            heading_ir_type = f"heading_{section.level}"
 
         if section.title:
-            title_text = self._nodes_to_text(section.title)
-            para = self.doc.add_paragraph(title_text, style=style_name)
+            # Prepend number to title (only for numbered headings)
+            if number_str:
+                display_text = f"{number_str} {title_text}"
+            else:
+                display_text = title_text
+            para = self.doc.add_paragraph(display_text)
+            heading_style = self.style_resolver.resolve(heading_ir_type)
+            if heading_style:
+                self.style_resolver.apply_paragraph_style(para, heading_style)
             self.bookmarks_manager.add_bookmark_if_needed(para, section.label)
 
     def _write_paragraph(self, paragraph: Paragraph) -> None:
         assert self.doc is not None, "Document not initialized"
         self.stats["paragraphs"] += 1
 
-        para = self.doc.add_paragraph(style="Normal")
+        para = self.doc.add_paragraph()
+        normal_style = self.style_resolver.resolve("normal")
+        if normal_style:
+            self.style_resolver.apply_paragraph_style(para, normal_style)
         self._write_inline_nodes(para, paragraph.runs)
         self.bookmarks_manager.add_bookmark_if_needed(para, paragraph.label)
 
-    def _write_inline_nodes(self, para: Any, nodes: Sequence[BaseNode]) -> None:
+    def _write_inline_math(self, para: DocxParagraph, latex: str) -> None:
+        """Рендерит inline математику как OMML.
+
+        Args:
+            para: Параграф для добавления математики.
+            latex: LaTeX строка (без обрамляющих $).
+        """
+        try:
+            from .mml2omml import convert_mathml_to_omml
+            from latex2mathml import converter
+
+            mathml_str = converter.convert(latex)
+            omml = convert_mathml_to_omml(mathml_str)
+            if omml is not None:
+                run = para.add_run()
+                run._element.append(omml)
+                return
+        except Exception:
+            pass
+        # Fallback: render as plain text with $...$
+        run = para.add_run(f"${latex}$")
+        run.italic = True
+
+    def _write_text_with_inline_math(self, para: DocxParagraph, text: str) -> None:
+        """Разбивает текст на обычные фрагменты и inline math ($...$).
+
+        Args:
+            para: Параграф для добавления текста.
+            text: Текст, возможно содержащий $...$ фрагменты.
+        """
+        import re
+
+        parts = re.split(r"(\$[^$]+\$)", text)
+        for part in parts:
+            if part.startswith("$") and part.endswith("$") and len(part) > 2:
+                latex = part[1:-1]
+                self._write_inline_math(para, latex)
+            elif part:
+                para.add_run(part)
+
+    def _write_inline_nodes(self, para: DocxParagraph, nodes: Sequence[BaseNode]) -> None:
         for node in nodes:
             if isinstance(node, TextRun):
-                para.add_run(node.text)
+                # Issue 4: Check for inline math ($...$) within text
+                if "$" in node.text:
+                    self._write_text_with_inline_math(para, node.text)
+                else:
+                    para.add_run(node.text)
             elif isinstance(node, InlineRunNode):
                 run = para.add_run(node.text)
                 if node.bold:
@@ -175,10 +298,10 @@ class DocxWriter:
                 except KeyError:
                     # Fallback: use Courier font if Code style doesn't exist
                     run.font.name = "Courier New"
+            elif isinstance(node, InlineMathNode):
+                self._write_inline_math(para, node.latex)
             elif isinstance(node, CrossReference):
                 self._write_cross_reference(node, para)
-            elif isinstance(node, CrossRefNode):
-                self._write_cross_ref_node(node, para)
             elif isinstance(node, CitationNode):
                 self._write_citation(node, para)
             elif hasattr(node, "content"):
@@ -186,11 +309,9 @@ class DocxWriter:
 
     def _write_list(self, list_block: ListBlock) -> None:
         assert self.doc is not None, "Document not initialized"
-        style = "List Bullet" if list_block.kind == ListKind.BULLET else "List Number"
-
-        for item in list_block.items:
-            text = self._nodes_to_text(item.content)
-            self.doc.add_paragraph(text, style=style)
+        assert self.lists_manager is not None, "ListsManager not initialized"
+        self.lists_manager.write_list(list_block)
+        self.stats["lists"] = self.stats.get("lists", 0) + 1
 
     def _write_figure(self, figure: Figure) -> None:
         assert self.doc is not None, "Document not initialized"
@@ -204,7 +325,7 @@ class DocxWriter:
                 figure.caption.chapter_number = figure.table.chapter_number
             # Write caption if present
             if figure.caption:
-                self._write_caption(figure.caption)
+                self._write_caption(figure.caption, figure.label)
             return
 
         # Regular image figure
@@ -222,6 +343,10 @@ class DocxWriter:
             figure.caption.number = figure.number
             figure.caption.chapter_number = figure.chapter_number
 
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if figure.label:
+            self.label_number_map[figure.label] = (figure.chapter_number, figure.number)
+
         if figure.image_path:
             try:
                 self.images_manager.add_image(self.doc, figure.image_path, width=Inches(5.0))
@@ -229,7 +354,7 @@ class DocxWriter:
                 self.stats["warnings"] += 1
 
         if figure.caption:
-            self._write_caption(figure.caption)
+            self._write_caption(figure.caption, figure.label)
 
     def _write_table(self, table: TableNode) -> None:
         self.stats["tables"] += 1
@@ -245,6 +370,10 @@ class DocxWriter:
         if table.caption:
             table.caption.number = table.number
             table.caption.chapter_number = table.chapter_number
+
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if table.label:
+            self.label_number_map[table.label] = (table.chapter_number, table.number)
 
         self.tables_manager.add_table(self.doc, table)
 
@@ -274,9 +403,16 @@ class DocxWriter:
             equation.caption.number = equation.number
             equation.caption.chapter_number = equation.chapter_number
 
+        # Issue 5: Store label → (chapter, number) for cross-reference resolution
+        if equation.label:
+            self.label_number_map[equation.label] = (equation.chapter_number, equation.number)
+
         def _render_as_image(latex: str, doc: _Document) -> None:
             """Рендерит уравнение как текстовую заглушку (MVP)."""
-            para = doc.add_paragraph(style="Normal")
+            para = doc.add_paragraph()
+            equation_style = self.style_resolver.resolve("equation")
+            if equation_style:
+                self.style_resolver.apply_paragraph_style(para, equation_style)
             para.add_run(f"[FORMULA: {latex}]")
             self.stats["warnings"] += 1
 
@@ -286,19 +422,29 @@ class DocxWriter:
             Returns:
                 True если успешно, False при ошибке.
             """
+            import logging
+            from .mml2omml import convert_mathml_to_omml
+            from latex2mathml import converter
+
+            logger = logging.getLogger(__name__)
+
             try:
-                from latex2mathml import converter
+                # Convert LaTeX to MathML, then to OMML
+                mathml_str = converter.convert(latex)
+                omml = convert_mathml_to_omml(mathml_str)
 
-                omml = converter.convert(latex)
+                if omml is None:
+                    logger.warning(f"Failed to convert equation to OMML. Latex: {latex}")
+                    return False
 
-                para = doc.add_paragraph(style="Normal")
+                para = doc.add_paragraph()
+                equation_style = self.style_resolver.resolve("equation")
+                if equation_style:
+                    self.style_resolver.apply_paragraph_style(para, equation_style)
                 run = para.add_run()
                 run._element.append(omml)
                 return True
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to render equation as OMML: {e}. Latex: {latex}")
                 return False
 
@@ -315,7 +461,7 @@ class DocxWriter:
                 _render_as_image(equation.latex, self.doc)
 
         if equation.caption:
-            self._write_caption(equation.caption)
+            self._write_caption(equation.caption, equation.label)
 
     def _write_toc(self, toc: TOCNode) -> None:
         """Записывает оглавление в документ.
@@ -329,12 +475,18 @@ class DocxWriter:
         """
         assert self.doc is not None, "Document not initialized"
         # Add TOC title as Heading 1
-        self.doc.add_paragraph(toc.title, style="Heading 1")
+        toc_heading = self.doc.add_paragraph(toc.title)
+        heading_style = self.style_resolver.resolve("heading_1")
+        if heading_style:
+            self.style_resolver.apply_paragraph_style(toc_heading, heading_style)
 
         # Add placeholder paragraph for TOC content
         # In a full implementation, this would be a TOC field
         # For MVP, we add a placeholder that indicates where TOC should be
-        placeholder = self.doc.add_paragraph(style="Normal")
+        placeholder = self.doc.add_paragraph()
+        normal_style = self.style_resolver.resolve("normal")
+        if normal_style:
+            self.style_resolver.apply_paragraph_style(placeholder, normal_style)
         placeholder.add_run(
             "[Table of Contents will be generated here - Right-click and select Update Field]"
         )
@@ -364,7 +516,10 @@ class DocxWriter:
 
         # Add bibliography heading
         # Uses Heading 1 style for consistent document structure
-        self.doc.add_paragraph(bib_section.heading, style="Heading 1")
+        bib_heading = self.doc.add_paragraph(bib_section.heading)
+        heading_style = self.style_resolver.resolve("heading_1")
+        if heading_style:
+            self.style_resolver.apply_paragraph_style(bib_heading, heading_style)
 
         # Get entries to write (sorted if AUTHOR_YEAR style)
         entries = bib_section.entries
@@ -376,10 +531,11 @@ class DocxWriter:
         # Write each bibliography entry with hanging indent
         for i, entry in enumerate(entries, start=1):
             # Format entry text based on citation style
-            entry_text = self._format_bibliography_entry(
-                entry, i, bib_section.style
-            )
-            para = self.doc.add_paragraph(style="Normal")
+            entry_text = self._format_bibliography_entry(entry, i, bib_section.style)
+            para = self.doc.add_paragraph()
+            normal_style = self.style_resolver.resolve("normal")
+            if normal_style:
+                self.style_resolver.apply_paragraph_style(para, normal_style)
 
             # Apply hanging indent (1.25cm as per ГОСТ 7.32-2017)
             # First line indent is negative (hanging), rest is positive
@@ -636,53 +792,30 @@ class DocxWriter:
         # Join parts with single space (author-year style uses space separator)
         return " ".join(parts)
 
-    def _write_cross_reference(self, ref: CrossReference, para: Any) -> None:
-        target = self.bookmarks_manager.get_bookmark(ref.target_label)
+    def _write_cross_reference(self, ref: CrossReference, para: DocxParagraph) -> None:
+        """Write a cross-reference as a hyperlink.
 
-        if target:
-            hyperlink = OxmlElement("w:hyperlink")
-            hyperlink.set(qn("w:anchor"), ref.target_label)
-
-            run = OxmlElement("w:r")
-            rPr = OxmlElement("w:rPr")
-
-            wcolor = OxmlElement("w:color")
-            wcolor.set(qn("w:val"), "0000FF")
-            rPr.append(wcolor)
-
-            wu = OxmlElement("w:u")
-            wu.set(qn("w:val"), "single")
-            rPr.append(wu)
-
-            run.append(rPr)
-
-            wt = OxmlElement("w:t")
-            wt.text = ref.ref_text if ref.ref_text else ref.target_label
-            run.append(wt)
-
-            hyperlink.append(run)
-            para._element.append(hyperlink)
-
-            self.stats["refs_resolved"] += 1
-        else:
-            run = para.add_run(ref.ref_text if ref.ref_text else ref.target_label)
-            self.stats["refs_unresolved"] += 1
-            self.stats["warnings"] += 1
-
-    def _write_cross_ref_node(self, ref: CrossRefNode, para: Any) -> None:
-        """Записывает CrossRefNode с chapter-aware нумерацией.
-
-        Args:
-            ref: CrossRefNode для записи.
-            para: Параграф для добавления текста ссылки.
+        ``ref.ref_text`` is expected to be populated by ``RefResolver``
+        before the writer runs (see ``cli.py``). As a fallback for legacy
+        IR or test paths where the resolver did not run, we still consult
+        ``label_number_map`` so we don't silently lose resolution.
         """
-        # Format reference text based on ref_kind and numbering
-        ref_text = self._format_cross_ref(ref)
+        ref_text = ref.ref_text or ""
+        if not ref_text and ref.target_label in self.label_number_map:
+            chapter_num, num = self.label_number_map[ref.target_label]
+            ref.number = num
+            ref.chapter_number = chapter_num
+            template = {
+                "fig": "Рис. {chapter}.{number}",
+                "tbl": "Табл. {chapter}.{number}",
+                "eq": "Формула {chapter}.{number}",
+            }.get(ref.ref_kind or "")
+            if template:
+                ref_text = template.format(chapter=chapter_num, number=num)
 
-        # Check if target bookmark exists
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
-        if target:
+        if target and ref_text:
             hyperlink = OxmlElement("w:hyperlink")
             hyperlink.set(qn("w:anchor"), ref.target_label)
 
@@ -708,11 +841,16 @@ class DocxWriter:
 
             self.stats["refs_resolved"] += 1
         else:
-            run = para.add_run(ref_text)
+            # No bookmark yet or unresolved: write the visible text plainly
+            # so the reader still sees something. Use ref_text if we managed
+            # to compute it, otherwise fall back to the raw label so the bug
+            # stays visible in QA rather than silently disappearing.
+            visible = ref_text or ref.target_label
+            run = para.add_run(visible)
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
-    def _write_citation(self, citation: CitationNode, para: Any) -> None:
+    def _write_citation(self, citation: CitationNode, para: DocxParagraph) -> None:
         """Записывает inline citation marker.
 
         Supports both NUMERIC and AUTHOR_YEAR citation styles:
@@ -730,7 +868,7 @@ class DocxWriter:
             entry = self.entry_lookup.get(citation.key)
             if entry and entry.author and entry.year:
                 # Extract last name (first word before comma or first word)
-                author_last = entry.author.split(',')[0].split()[0] if entry.author else ""
+                author_last = entry.author.split(",")[0].split()[0] if entry.author else ""
                 citation_text = f"({author_last}, {entry.year})"
             else:
                 # Fallback to numeric if no author/year
@@ -753,7 +891,7 @@ class DocxWriter:
         """
         # Determine ref kind from target label prefix if not set
         if not ref.ref_kind:
-            ref.ref_kind = self._infer_ref_kind(ref.target_label)
+            ref.ref_kind = infer_ref_kind(ref.target_label)
 
         # Get localized label from config
         label = ""
@@ -780,43 +918,28 @@ class DocxWriter:
 
         return formatted
 
-    def _infer_ref_kind(self, label: str) -> Optional[str]:
-        """Определяет тип ссылки по префиксу метки.
+    def _write_caption(self, caption: Caption, label: Optional[str] = None) -> Optional[object]:
+        """Write caption paragraph and optionally register a bookmark.
 
-        Args:
-            label: Метка ссылки (например, "fig:results", "tbl:data").
-
-        Returns:
-            Тип ссылки ("fig", "tbl", "eq", "ch") или None если не удалось определить.
+        Returns the paragraph if ``label`` was provided, else ``None``.
         """
-        if label.startswith("fig:"):
-            return "fig"
-        elif label.startswith("tbl:") or label.startswith("table:"):
-            return "tbl"
-        elif label.startswith("eq:") or label.startswith("equation:"):
-            return "eq"
-        elif label.startswith("ch:") or label.startswith("chapter:"):
-            return "ch"
-        return None
-
-    def _write_caption(self, caption: Caption) -> None:
         assert self.doc is not None, "Document not initialized"
-        # Get localized label from config
-        label = ""
+        # Get localized prefix from config (rename to avoid shadowing ``label`` arg)
+        prefix = ""
         if caption.numbering_kind == NumberingKind.FIGURE:
-            label = self.ref_labels.figure
+            prefix = self.ref_labels.figure
         elif caption.numbering_kind == NumberingKind.TABLE:
-            label = self.ref_labels.table
+            prefix = self.ref_labels.table
         elif caption.numbering_kind == NumberingKind.EQUATION:
-            label = self.ref_labels.equation
+            prefix = self.ref_labels.equation
 
         # Format: "Рис. 1.2 - Caption text" or "Таблица 2.1 - Caption text"
         # For equations, use parentheses: "Формула (1.3)"
-        if label:
+        if prefix:
             if caption.numbering_kind == NumberingKind.EQUATION:
-                formatted = f"{label} ({caption.chapter_number}.{caption.number})"
+                formatted = f"{prefix} ({caption.chapter_number}.{caption.number})"
             else:
-                formatted = f"{label} {caption.chapter_number}.{caption.number}"
+                formatted = f"{prefix} {caption.chapter_number}.{caption.number}"
         else:
             formatted = f"{caption.chapter_number}.{caption.number}"
 
@@ -824,54 +947,76 @@ class DocxWriter:
         if caption.text:
             formatted = f"{formatted} — {caption.text}"  # em-dash for GOST style
 
-        para = self.doc.add_paragraph(style="Caption")
+        para = self.doc.add_paragraph()
+        # Use different styles for figure and table captions
+        if caption.numbering_kind == NumberingKind.TABLE:
+            caption_ir_type = "caption_table"
+        else:
+            caption_ir_type = "caption_figure"
+        caption_style = self.style_resolver.resolve(caption_ir_type)
+        if caption_style:
+            self.style_resolver.apply_paragraph_style(para, caption_style)
         para.add_run(formatted)
+
+        # Register a bookmark so cross-references can hyperlink to this caption
+        if label:
+            self.bookmarks_manager.add_bookmark_if_needed(para, label)
+            return para
+        return None
 
     def _write_code_block(self, code_block: CodeBlockNode) -> None:
         """Записывает блок кода в документ.
 
         Использует моноширинный шрифт (Courier New/Consolas) для отображения кода.
+        Применяет синтаксическое подсвечивание через Pygments, если язык определён.
         Сохраняет отступы и переносы строк. Экранирует XML спецсимволы.
 
         Args:
             code_block: IR узел блока кода.
         """
-        assert self.doc is not None, "Document not initialized"
-        from docx.shared import Pt
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.shared import Pt, RGBColor
 
-        # Разбиваем содержимое на строки
+        assert self.doc is not None, "Document not initialized"
+
+        # Determine if we should apply syntax highlighting
+        language = code_block.language or "plain"
+        apply_highlighting = is_supported_language(language)
+
+        # Background color for code blocks
+        bg_color = RGBColor(0x1E, 0x1E, 0x1E)  # Dark gray (VS Code dark)
+
+        # Process code line by line to preserve formatting
         lines = code_block.content.split("\n")
 
-        # Применяем фоновое затенение к каждому параграфу кода
         for line in lines:
-            # Создаем параграф для каждой строки кода
+            # Create paragraph for each code line
             para = self.doc.add_paragraph(style="Normal")
 
-            # Применяем фоновое затенение (серый цвет)
-            # Добавляем shading через OxmlElement
+            # Apply dark background shading
             shading_elm = OxmlElement("w:shd")
-            shading_elm.set(qn("w:fill"), "F0F0F0")  # Светло-серый цвет
-            para._element.get_or_add_pPr().insert_element_before(
-                shading_elm, "w:spacing"
-            )
+            shading_elm.set(qn("w:fill"), "1E1E1E")
+            para._element.get_or_add_pPr().insert_element_before(shading_elm, "w:spacing")
 
-            # Экранируем XML спецсимволы и добавляем текст
+            # Escape XML special characters
             escaped_line = self._escape_xml_text(line)
-            run = para.add_run(escaped_line)
 
-            # Применяем моноширинный шрифт
-            run.font.name = "Courier New"
-            # Устанавливаем шрифт для East Asian characters (для совместимости)
-            if run._element.rPr is not None and run._element.rPr.rFonts is not None:
-                run._element.rPr.rFonts.set(qn("w:eastAsia"), "Courier New")
-            run.font.size = Pt(9)  # Мелкий шрифт для кода
+            # Apply syntax highlighting or simple monospace
+            if apply_highlighting:
+                highlight_code(escaped_line, language, para, bg_color)
+            else:
+                # Simple monospace without highlighting
+                run = para.add_run(escaped_line)
+                run.font.name = "Courier New"
+                run.font.size = Pt(9)
+                # Light gray for plain text
+                run.font.color.rgb = RGBColor(0xD4, 0xD4, 0xD4)
 
-            # Удаляем интерлиньяж (межстрочный интервал)
+            # Remove interline spacing
             para.paragraph_format.space_before = Pt(0)
             para.paragraph_format.space_after = Pt(0)
-            para.paragraph_format.line_spacing = 1.0  # Одиночный интервал
+            para.paragraph_format.line_spacing = 1.0
 
     def _escape_xml_text(self, text: str) -> str:
         """Экранирует XML спецсимволы для безопасного использования в DOCX.
@@ -899,10 +1044,6 @@ class DocxWriter:
             elif hasattr(node, "content"):
                 text_parts.append(self._nodes_to_text(node.content))
         return "".join(text_parts)
-
-    def _get_heading_style(self, level: int) -> str:
-        styles = {1: "Heading 1", 2: "Heading 2", 3: "Heading 3"}
-        return styles.get(level, "Heading 1")
 
     def validate_references(self, ir_document: IRDocument) -> ValidationResult:
         """Выполняет bidirectional валидацию ссылок и меток.

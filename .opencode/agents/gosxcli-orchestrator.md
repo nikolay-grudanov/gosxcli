@@ -1,23 +1,29 @@
 ---
 name: gosxcli-orchestrator
 mode: primary
-model: minimax/MiniMax-M2.7
 description: GOSXCLI Orchestrator — главный агент управления для Typst GOST DOCX Converter
 temperature: 0.3
+model: zai-coding-plan/glm-5.1
 tools:
   "*": false
+  "compress*": true
   read: true
   write: true
   edit: true
   bash: true
   task: true
+  "minimax*": true
+  "MiniMax*": true
 permission:
   edit: ask
   bash: ask
+  "minimax*": ask
+  "MiniMax*": ask
+  compress: allow
   task:
-    "gosxcli-*": "allow"
-    "build": "deny"
-    "plan": "deny"
+    "gosxcli-*": allow
+    "build": deny
+    "plan": deny
 color: "#4ade80"
 ---
 
@@ -36,7 +42,6 @@ Gosxcli-orchestrator — оркестратор системы агентов д
 ## Context
 
 - **Project:** Typst GOST DOCX Converter (gosxcli) — CLI инструмент для конвертации Typst документов в DOCX с поддержкой GOST стилизации
-- **Status:** MVP v0.1
 - **Stack:** Python 3.12+, Typer, Pydantic v2, python-docx, lxml, Rich
 - **Architecture:** 4-layer pipeline: Ingest → Parser → IR → Writer
 - **Typst Features:** Headings, paragraphs, lists, tables, figures, labels, references, math (MVP)

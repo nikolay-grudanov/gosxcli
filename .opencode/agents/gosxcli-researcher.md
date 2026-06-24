@@ -2,7 +2,7 @@
 name: gosxcli-researcher
 description: Web research and information gathering for Typst, DOCX, GOST standards, and document conversion
 mode: subagent
-model: zai-coding-plan/glm-4.7
+model: minimax-coding-plan/MiniMax-M2.5
 temperature: 0.8
 tools:
   "*": false

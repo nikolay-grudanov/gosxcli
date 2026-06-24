@@ -2,15 +2,18 @@
 
 from typst_gost_docx.ir.model import (
     ChapterContext,
+    CrossReference,
     CrossRefNode,
     Figure,
     TableNode,
     Equation,
+    Paragraph,
     Section,
     Caption,
     NumberingKind,
 )
 from typst_gost_docx.parser.refs import RefResolver
+from typst_gost_docx.utils.ref_utils import infer_ref_kind
 from typst_gost_docx.writers.docx_writer import DocxWriter
 from typst_gost_docx.config import RefLabels
 
@@ -50,22 +53,25 @@ def test_chapter_context_counters():
 
 def test_ref_resolver_infer_ref_kind():
     """Test that RefResolver infers ref kind from label prefixes."""
-    resolver = RefResolver(cross_ref_map=None)
-
-    # Test various prefixes
-    assert resolver._infer_ref_kind("fig:results") == "fig"
-    assert resolver._infer_ref_kind("tbl:data") == "tbl"
-    assert resolver._infer_ref_kind("table:data") == "tbl"
-    assert resolver._infer_ref_kind("eq:energy") == "eq"
-    assert resolver._infer_ref_kind("equation:energy") == "eq"
-    assert resolver._infer_ref_kind("ch:intro") == "ch"
-    assert resolver._infer_ref_kind("chapter:intro") == "ch"
-    assert resolver._infer_ref_kind("unknown:label") is None
+    # Test various prefixes using the standalone function
+    assert infer_ref_kind("fig:results") == "fig"
+    assert infer_ref_kind("tbl:data") == "tbl"
+    assert infer_ref_kind("table:data") == "tbl"
+    assert infer_ref_kind("eq:energy") == "eq"
+    assert infer_ref_kind("equation:energy") == "eq"
+    assert infer_ref_kind("ch:intro") == "ch"
+    assert infer_ref_kind("chapter:intro") == "ch"
+    assert infer_ref_kind("unknown:label") is None
 
 
 def test_ref_resolver_cross_ref_node():
-    """Test that RefResolver populates CrossRefNode correctly."""
-    from typst_gost_docx.ir.model import CrossRefMap
+    """Test that RefResolver populates CrossReference correctly.
+
+    The legacy ``_resolve_cross_ref_node`` private method was retired
+    in favour of the document-wide ``resolve_document`` resolver. This
+    test exercises the same logic through the public API.
+    """
+    from typst_gost_docx.ir.model import Document
 
     # Create a labeled figure
     figure = Figure(
@@ -75,18 +81,25 @@ def test_ref_resolver_cross_ref_node():
         caption=Caption(text="Results"),
     )
 
-    # Create cross-ref map and register figure
-    cross_ref_map = CrossRefMap()
-    cross_ref_map.register("fig:results", figure)
+    # Create resolver and a document that owns the figure
+    resolver = RefResolver()
+    doc = Document(id="test", blocks=[figure])
 
-    # Create resolver
-    resolver = RefResolver(cross_ref_map)
-
-    # Create CrossRefNode
-    ref = CrossRefNode(target_label="fig:results")
+    # Create a CrossReference targeting the figure
+    ref = CrossReference(target_label="fig:results")
+    # Inject the reference into a paragraph so the resolver walks it.
+    para = Paragraph(runs=[ref])
+    doc.blocks.append(para)
 
     # Resolve
-    resolver._resolve_cross_ref_node(ref)
+    warnings = resolver.resolve_document(doc)
+
+    # Resolve should succeed and populate the reference
+    assert warnings == []
+    assert ref.ref_kind == "fig"
+    assert ref.number == 2
+    assert ref.chapter_number == 1
+    assert ref.ref_text == "Рис. 1.2"
 
     # Check that ref_kind, number, chapter_number are populated
     assert ref.ref_kind == "fig"
@@ -195,17 +208,15 @@ def test_docx_writer_write_caption():
 
 def test_docx_writer_infer_ref_kind():
     """Test that DocxWriter infers ref kind from label prefixes."""
-    writer = DocxWriter()
-
-    # Test various prefixes
-    assert writer._infer_ref_kind("fig:results") == "fig"
-    assert writer._infer_ref_kind("tbl:data") == "tbl"
-    assert writer._infer_ref_kind("table:data") == "tbl"
-    assert writer._infer_ref_kind("eq:energy") == "eq"
-    assert writer._infer_ref_kind("equation:energy") == "eq"
-    assert writer._infer_ref_kind("ch:intro") == "ch"
-    assert writer._infer_ref_kind("chapter:intro") == "ch"
-    assert writer._infer_ref_kind("unknown:label") is None
+    # Test various prefixes using the standalone function
+    assert infer_ref_kind("fig:results") == "fig"
+    assert infer_ref_kind("tbl:data") == "tbl"
+    assert infer_ref_kind("table:data") == "tbl"
+    assert infer_ref_kind("eq:energy") == "eq"
+    assert infer_ref_kind("equation:energy") == "eq"
+    assert infer_ref_kind("ch:intro") == "ch"
+    assert infer_ref_kind("chapter:intro") == "ch"
+    assert infer_ref_kind("unknown:label") is None
 
 
 def test_figure_and_caption_numbering():

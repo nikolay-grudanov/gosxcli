@@ -45,8 +45,8 @@ class TypstScanner:
             ("NEWLINE", r"\n"),
             ("LABEL", r"<([\w:-]+)>"),
             ("CITATION", r"@\[[\w:-]+\]"),  # Bibliography citation: @[key] including brackets
-            ("REF", r"@[a-zA-Z0-9_-]+"),
-            ("REF_INLINE", r"@(fig|tbl|eq)-([a-zA-Z0-9_-]+)"),
+            ("REF_INLINE", r"@(fig|tbl|eq)[:\-]([\w-]+)"),
+            ("REF", r"@[\w:-]+"),
             ("BLOCK_MATH_DELIM", r"\$\$"),
             ("INLINE_MATH_DELIM", r"\$"),
             ("EMPHASIS", r"\*(.+?)\*"),

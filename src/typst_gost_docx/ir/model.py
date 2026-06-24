@@ -7,7 +7,7 @@ for converting Typst documents to DOCX format.
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class NodeType(str, Enum):
@@ -137,7 +137,7 @@ class Paragraph(BaseNode):
 
     node_type: NodeType = NodeType.PARAGRAPH
     runs: list["InlineNode"] = Field(default_factory=list)
-    _content: str = ""
+    _content: str = PrivateAttr(default="")
 
     @property
     def content(self) -> str:
@@ -339,22 +339,35 @@ class Bookmark(BaseNode):
 
 
 class CrossReference(BaseNode):
-    """Legacy cross-reference node."""
+    """Cross-reference node (inline `@fig:foo` or standalone).
+
+    The canonical reference node used throughout the pipeline. The parser
+    populates `target_label` and `ref_kind` from the label prefix. A separate
+    resolver pass (after parser, before writer) fills `number`,
+    `chapter_number`, and `ref_text` so the writer can render the visible
+    text directly without re-implementing resolution logic.
+
+    Attributes:
+        target_label: The label being referenced, e.g. "fig:results".
+        ref_kind: One of {"fig", "tbl", "eq", "section"} inferred from
+            label prefix; "" if unparseable.
+        ref_text: Pre-computed visible text such as "Рис. 1.2" or "Табл. 2.1".
+            The writer uses this as-is when present.
+        number: Chapter-local counter from the target node (Figure.number etc.).
+        chapter_number: Chapter index from the target node.
+    """
 
     node_type: NodeType = NodeType.CROSS_REFERENCE
-    target_label: str = ""
-    ref_text: Optional[str] = None
-
-
-class CrossRefNode(BaseNode):
-    """Cross-reference node with chapter-aware numbering."""
-
-    node_type: NodeType = NodeType.CROSS_REF
     target_label: str = ""
     ref_kind: Optional[str] = None
     ref_text: Optional[str] = None
     number: int = 0
     chapter_number: int = 0
+
+
+# Deprecated alias kept for backward compatibility with downstream code/tests
+# that still import CrossRefNode. New code must use CrossReference.
+CrossRefNode = CrossReference
 
 
 class TOCNode(BaseNode):
@@ -470,6 +483,7 @@ class ChapterContext(BaseModel):
         chapter_number: Current chapter number (1-based).
         chapter_title: Title of the current chapter.
         section_counter: Counter for sections within the current chapter.
+        heading_counters: Hierarchical counters for heading numbering [level1, level2, level3].
     """
 
     chapter_number: int = 1
@@ -478,6 +492,7 @@ class ChapterContext(BaseModel):
     figure_counter: int = 0
     table_counter: int = 0
     equation_counter: int = 0
+    heading_counters: list[int] = [0, 0, 0]
 
 
 # Type alias for inline nodes (used in Paragraph.runs)

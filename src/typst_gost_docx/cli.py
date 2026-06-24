@@ -16,6 +16,7 @@ from .ingest.project_loader import TypstProjectLoader
 from .logging import setup_logging
 from .parser.extractor_v2 import TypstExtractorV2
 from .writers.docx_writer import DocxWriter
+from .writers.styles import get_default_template_path
 
 if TYPE_CHECKING:
     from .ir.model import BaseNode, Document
@@ -40,7 +41,9 @@ def convert(
         MathMode.FALLBACK, "--math-mode", help="Math rendering mode"
     ),
     bibliography_style: CitationStyle = typer.Option(
-        CitationStyle.NUMERIC, "--bibliography-style", help="Citation style (numeric or author-year)"
+        CitationStyle.NUMERIC,
+        "--bibliography-style",
+        help="Citation style (numeric or author-year)",
     ),
     log_level: str = typer.Option("INFO", "--log-level", help="Log level"),
     benchmark: bool = typer.Option(False, "--benchmark", help="Enable benchmark mode"),
@@ -116,10 +119,46 @@ def _run_conversion(config: Config) -> dict[str, Any]:
 
     # Извлечение IR
     parse_start_time = time.time()
-    text = files[str(config.input_file)]
-    extractor = TypstExtractorV2(text, str(config.input_file))
+    text = loader.resolve_includes(files)
+
+    # Поиск библиографических файлов для распознавания цитирований
+    bib_keys: set[str] = set()
+    bib_files = list(config.input_file.parent.glob("*.bib"))
+    if bib_files:
+        from .parser.bibliography import parse_bibliography
+
+        for bib_file in bib_files:
+            try:
+                bib_content = bib_file.read_text(encoding="utf-8")
+                parsed = parse_bibliography(bib_content)
+                bib_keys.update(parsed.entries.keys())
+                logger.debug(
+                    "Загружены ключи библиографии из %s: %d", bib_file.name, len(parsed.entries)
+                )
+            except Exception as e:
+                logger.warning("Ошибка чтения библиографии %s: %s", bib_file, e)
+
+    extractor = TypstExtractorV2(text, str(config.input_file), bib_keys=bib_keys)
     ir_document = extractor.extract()
     parse_time = time.time() - parse_start_time
+
+    # Resolve every cross-reference BEFORE the writer runs. This fills
+    # `ref_kind`, `number`, `chapter_number`, and `ref_text` on each
+    # CrossReference so the writer can render visible text directly
+    # without maintaining its own label→number map.
+    #
+    # The chapter numberer runs first because it assigns
+    # `Figure.number` / `Table.number` / `Equation.number` which the
+    # resolver then reads.
+    from .parser.numbering import ChapterNumberer
+    from .parser.refs import RefResolver
+
+    ChapterNumberer().number_document(ir_document)
+    resolver = RefResolver()
+    unresolved_warnings = resolver.resolve_document(ir_document)
+    if unresolved_warnings:
+        for w in unresolved_warnings:
+            logger.warning("Unresolved reference: %s", w)
 
     # Dump IR если нужно
     if config.dump_ir or config.dump_json:
@@ -129,15 +168,41 @@ def _run_conversion(config: Config) -> dict[str, Any]:
             json.dump(ir_json, f, indent=2, ensure_ascii=False)
         console.print(f"[dim]IR dumped to: {json_path}[/dim]")
 
+    # Resolve template path for reporting and debug output
+    resolved_template: Optional[Path] = None
+    template_source: str = "none"
+    if config.reference_doc is not None:
+        if config.reference_doc.exists():
+            resolved_template = config.reference_doc
+            template_source = "custom"
+        else:
+            logger.warning("Пользовательский шаблон не найден: %s", config.reference_doc)
+            resolved_template = get_default_template_path()
+            template_source = "built-in" if resolved_template else "none"
+    else:
+        resolved_template = get_default_template_path()
+        template_source = "built-in" if resolved_template else "none"
+
+    logger.info(
+        "Шаблон: %s (%s)",
+        resolved_template or "нет",
+        template_source,
+    )
+
     # Генерация DOCX
     write_start_time = time.time()
     writer = DocxWriter(
         reference_doc=config.reference_doc,
         math_mode=config.math_mode,
         ref_labels=config.ref_labels,
+        base_dir=config.input_file.parent,
     )
     stats = writer.write(ir_document, config.output_file)
     write_time = time.time() - write_start_time
+
+    # Add template info to stats
+    stats["template_path"] = str(resolved_template) if resolved_template else "—"
+    stats["template_source"] = template_source
 
     total_time = time.time() - total_start_time
 
@@ -232,6 +297,8 @@ def _print_summary(stats: dict[str, Any]) -> None:
     table.add_row("References resolved", str(stats.get("refs_resolved", 0)))
     table.add_row("References unresolved", str(stats.get("refs_unresolved", 0)))
     table.add_row("Warnings", str(stats.get("warnings", 0)))
+    table.add_row("Template", str(stats.get("template_path", "—")))
+    table.add_row("Template source", str(stats.get("template_source", "—")))
 
     console.print()
     console.print(table)

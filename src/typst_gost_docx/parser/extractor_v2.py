@@ -1,6 +1,7 @@
 """State-machine based Typst extractor."""
 
 import logging
+import re
 import uuid
 from typing import Optional, List, Any
 from enum import Enum, auto
@@ -12,6 +13,7 @@ from ..ir.model import (
     TextRun,
     InlineRunNode,
     InlineCodeNode,
+    InlineMathNode,
     InlineNode,
     ListBlock,
     ListItem,
@@ -52,7 +54,14 @@ class ParserState(Enum):
 class TypstExtractorV2:
     """State-machine based Typst extractor."""
 
-    def __init__(self, text: str, file_path: str):
+    def __init__(self, text: str, file_path: str, bib_keys: set[str] | None = None):
+        """Инициализирует экстрактор.
+
+        Args:
+            text: Текст Typst документа.
+            file_path: Путь к файлу для отладки.
+            bib_keys: Множество ключей библиографии для распознавания цитирований.
+        """
         self.text = text
         self.file_path = file_path
         self.scanner = TypstScanner(text)
@@ -60,9 +69,12 @@ class TypstExtractorV2:
         self.pos = 0
 
         self.state = ParserState.DOCUMENT
-        self.paren_stack: List[int] = []
-        self.bracket_stack: List[int] = []
+        self.paren_stack: list[int] = []
+        self.bracket_stack: list[int] = []
         self.current_label: Optional[str] = None
+
+        # Библиографические ключи для распознавания цитирований
+        self._bib_keys: set[str] = bib_keys if bib_keys else set()
 
         # Citation tracking
         self._citation_keys: dict[str, int] = {}  # key -> number
@@ -223,8 +235,25 @@ class TypstExtractorV2:
                 ref = self._extract_ref()
                 if ref:
                     nodes.append(ref)
+            elif token.type == "REF_INLINE":
+                # Handle @fig-1, @tbl:test, @eq:formula patterns
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                ref = self._extract_ref()
+                if ref:
+                    nodes.append(ref)
             elif token.type == "LABEL":
                 self._process_label()
+            elif token.type == "INLINE_MATH_DELIM":
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                math = self._extract_inline_math()
+                if math is not None:
+                    nodes.append(math)
             else:
                 current_text += token.value
                 self.pos += 1
@@ -233,6 +262,43 @@ class TypstExtractorV2:
             nodes.extend(self._parse_inline_formatting(current_text))
 
         return nodes
+
+    def _extract_inline_math(self) -> Optional[InlineMathNode]:
+        """Parse ``$...$`` into an ``InlineMathNode``.
+
+        Consumes the opening ``$``, then walks tokens until the next
+        ``INLINE_MATH_DELIM`` (``$``) or a newline, accumulating raw text
+        into ``latex``. Nested ``$`` is not supported — Typst does not
+        allow it either, but neither does our scanner.
+        """
+        if self.pos >= len(self.tokens):
+            return None
+        if self.tokens[self.pos].type != "INLINE_MATH_DELIM":
+            return None
+        # Consume the opening '$'.
+        self.pos += 1
+
+        latex_parts: list[str] = []
+        while self.pos < len(self.tokens):
+            tok = self.tokens[self.pos]
+            if tok.type == "INLINE_MATH_DELIM":
+                # Consume the closing '$' and stop.
+                self.pos += 1
+                break
+            if tok.type == "NEWLINE":
+                # Unterminated inline math — bail out, leave closing '$' for next pass.
+                break
+            latex_parts.append(tok.value)
+            self.pos += 1
+
+        latex = "".join(latex_parts).strip()
+        if not latex:
+            return None
+        return InlineMathNode(
+            node_type=NodeType.INLINE_MATH,
+            id=str(uuid.uuid4()),
+            latex=latex,
+        )
 
     def _extract_list(self) -> Optional[ListBlock]:
         """Extract list from tokens.
@@ -311,6 +377,14 @@ class TypstExtractorV2:
                 numbering_kind=NumberingKind.TABLE if nested_table else NumberingKind.FIGURE,
             )
 
+        # Skip whitespace tokens between figure end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
+
         # Check for label immediately after figure
         # Labels can appear as <label> or be set via current_label
         if self.current_label:
@@ -374,6 +448,14 @@ class TypstExtractorV2:
                 if row_cells:
                     table.rows.append(row_cells)
 
+        # Skip whitespace tokens between table end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
+
         # Check for label immediately after table
         # Labels can appear as <label> or be set via current_label
         if self.current_label:
@@ -401,8 +483,6 @@ class TypstExtractorV2:
         Returns:
             IR TableNode or None if no table found
         """
-        import re
-
         # Look for table( pattern (with or without leading #)
         table_match = re.search(r"table\s*\(", content)
         if not table_match:
@@ -483,7 +563,7 @@ class TypstExtractorV2:
         token = self.tokens[self.pos]
         self.pos += 1
 
-        latex = self._get_text_until_block_math_end()
+        latex = self._get_text_until_block_math_end().strip()
 
         equation = Equation(
             id=str(uuid.uuid4()),
@@ -493,6 +573,14 @@ class TypstExtractorV2:
             latex=latex,
             numbering_kind=NumberingKind.EQUATION,
         )
+
+        # Skip whitespace tokens between equation end and potential label
+        while self.pos < len(self.tokens):
+            t = self.tokens[self.pos]
+            if t.type == "TEXT" and not t.value.strip():
+                self.pos += 1
+                continue
+            break
 
         # Check for label immediately after equation
         # Labels can appear as <label> or be set via current_label
@@ -581,7 +669,6 @@ class TypstExtractorV2:
         title = "Содержание"  # Default title
 
         # Check for title: "..." parameter
-        import re
 
         title_match = re.search(r'title\s*:\s*"([^"]+)"', content)
         if title_match:
@@ -609,7 +696,6 @@ class TypstExtractorV2:
         token_value = token.value
 
         # Extract path from token value like #bibliography("refs.bib")
-        import re
 
         bib_path_match = re.search(r'"([^"]+\.bib)"', token_value)
         if not bib_path_match:
@@ -677,11 +763,14 @@ class TypstExtractorV2:
 
         self.pos += 1
 
-    def _extract_ref(self) -> Optional[CrossReference]:
-        """Extract reference from tokens.
+    def _extract_ref(self) -> Optional[InlineNode]:
+        """Extract reference or citation from tokens.
+
+        Checks if the reference key matches a known bibliography key.
+        If so, creates a CitationNode instead of CrossReference.
 
         Returns:
-            IR CrossReference or None
+            IR InlineNode (CitationNode or CrossReference) or None
         """
         token = self.tokens[self.pos]
         ref_match = token.value
@@ -689,6 +778,26 @@ class TypstExtractorV2:
         if ref_match.startswith("@"):
             target_label = ref_match[1:].strip()
 
+            # Проверяем, является ли это библиографическим цитированием
+            if target_label in self._bib_keys:
+                # Treat as citation
+                if target_label not in self._citation_keys:
+                    self._citation_keys[target_label] = len(self._citation_keys) + 1
+                    self._citation_order.append(target_label)
+
+                citation = CitationNode(
+                    node_type=NodeType.CITATION,
+                    id=str(uuid.uuid4()),
+                    key=target_label,
+                    number=self._citation_keys[target_label],
+                    source_location=SourceLocation(
+                        file_path=self.file_path, line=token.line, column=token.column
+                    ),
+                )
+                self.pos += 1
+                return citation
+
+            # Regular cross-reference
             ref = CrossReference(
                 node_type=NodeType.CROSS_REFERENCE,
                 id=str(uuid.uuid4()),
@@ -754,8 +863,6 @@ class TypstExtractorV2:
         Returns:
             List of ColSpec objects with width/width_percent/align
         """
-        import re
-
         columns: list[ColSpec] = []
 
         # Pattern: columns: (spec1, spec2, ...)
@@ -825,8 +932,6 @@ class TypstExtractorV2:
         Returns:
             Border width in points
         """
-        import re
-
         # Pattern: stroke: 0.7pt
         match = re.search(r"stroke:\s*([0-9.]+)(?:pt|mm)", content)
         if match:
@@ -846,8 +951,6 @@ class TypstExtractorV2:
         Returns:
             Fill lambda expression string or None
         """
-        import re
-
         # Pattern: fill: (col, row) => if row == 0 { ... }
         match = re.search(r"fill:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{[^}]+\}", content)
         if match:
@@ -867,8 +970,6 @@ class TypstExtractorV2:
         Returns:
             Align lambda expression string or None
         """
-        import re
-
         # Pattern: align: (col, row) => if row == 0 { ... }
         match = re.search(
             r"align:\s*\(col,\s*row\)\s*=>\s*if\s+row\s*==\s*0\s*\{([^}]+)\}", content
@@ -899,8 +1000,6 @@ class TypstExtractorV2:
         # Extract fill color from lambda if present
         fill_color = None
         if fill_lambda:
-            import re
-
             fill_match = re.search(r"\{\s*(luma|rgb)\(([^)]+)\)", fill_lambda)
             if fill_match:
                 fill_color = fill_match.group(2)
@@ -957,7 +1056,6 @@ class TypstExtractorV2:
             rowspan = 1
 
             # Check for table.cell(colspan: N) or table.cell(rowspan: N)
-            import re
 
             colspan_match = re.search(r"table\.cell\(colspan:\s*(\d+)\)", content)
             rowspan_match = re.search(r"table\.cell\(rowspan:\s*(\d+)\)", content)
@@ -1055,8 +1153,6 @@ class TypstExtractorV2:
         Returns:
             List of IR nodes with proper formatting
         """
-        import re
-
         nodes: list[InlineNode] = []
 
         # Pattern for bold (*text*), italic (_text_), and code (`code`)
@@ -1201,8 +1297,6 @@ class TypstExtractorV2:
         Returns:
             Image path or None
         """
-        import re
-
         match = re.search(r'image\s*\(\s*"([^"]+)"', content)
         return match.group(1) if match else None
 
@@ -1215,7 +1309,5 @@ class TypstExtractorV2:
         Returns:
             Caption text or None
         """
-        import re
-
         match = re.search(r"caption\s*:\s*\[([^]]+)\]", content)
         return match.group(1) if match else None

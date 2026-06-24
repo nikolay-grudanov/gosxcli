@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "typst-gost-docx"
-version = "0.2.0"
+version = "0.4.0"
 description = "Typst to DOCX converter for academic documents with GOST styling"
 readme = "README.md"
 license = {text = "MIT"}
@@ -26,6 +26,7 @@ dependencies = [
     "lxml>=4.9.0",
     "rich>=13.0.0",
     "latex2mathml>=3.76.0",
+    "pygments>=2.17.0",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,9 @@ typst-gost-docx = "typst_gost_docx.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+typst_gost_docx = ["templates/*.docx"]
 
 [tool.ruff]
 line-length = 100
