@@ -2,9 +2,11 @@
 
 Typst to DOCX converter for academic documents with GOST styling support.
 
-## Status: v0.4.0 (GOST Template Integration)
+## Status: v0.5.0 (Enhanced Academic Support)
 
 Production-ready tool for converting Typst academic documents (especially those using `@preview/modern-g7-32`) to editable DOCX files while preserving structure, references, tables, images, and applying GOST-compliant styling.
+
+**v0.5.0 highlights:** Inline `#link()` rendered as DOCX hyperlinks with external relationships, enhanced reference validation with file/line attribution and structured `ValidationIssue` reports, and a `benchmarks/compare.py` script for tracking conversion performance over time. Spec 001 (Enhanced Academic Support) is now closed.
 
 **v0.4.0 highlights:** Built-in ГОСТ 7.32-2017 reference template (Times New Roman, 14pt, black headings), `--reference-doc` CLI flag for custom templates, and StyleResolver with iterative fallback for non-standard style_id's (e.g. Heading 1 → "781").
 
@@ -246,7 +248,7 @@ typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib 
 **Pygments-based syntax highlighting** with VS Code Dark+ color scheme:
 
 | Token Type | Color | Example |
-|-----------|-------|--------|
+|-----------|-------|---------|
 | Keywords | #569CD6 (blue) | `def`, `class`, `if`, `return` |
 | Strings | #CE9178 (orange) | `"Hello"`, `'World'` |
 | Comments | #6A9955 (green) | `// comment`, `# comment` |
@@ -255,18 +257,70 @@ typst-gost-docx convert thesis.typ -o thesis.docx --bibliography references.bib 
 | Operators | #D4D4D4 (white) | `+`, `-`, `*`, `/` |
 | Text | #D4D4D4 (white) | Regular code text |
 
-**Features:**
+**Features**:
 - Dark background (#1E1E1E) for code blocks
 - Syntax highlighting for supported languages
 - Fallback to plain text for unsupported languages
 - Preserved indentation and formatting
+- Small font size (9pt) for code blocks
 
-**CLI usage:**
+**CLI usage**:
 ```bash
 # Syntax highlighting is automatic for supported languages
 typst-gost-docx convert thesis.typ -o thesis.docx
 ```
 
+### Inline Hyperlinks
+
+`#link("url")[label]` and bare `#link("url")` are emitted as real DOCX hyperlinks (`<w:hyperlink r:id="...">`) backed by `TargetMode="External"` relationships. The URL survives round-tripping through Microsoft Word.
+
+```typst
+Visit #link("https://typst.app")[Typst] for the official docs.
+See also #link("https://github.com") for source.
+```
+
+**CLI usage**: rendering is automatic; no extra flag required.
+
+## Performance Benchmarking
+
+`pytest-benchmark` measures conversion time against per-fixture thresholds:
+
+| Fixture | Threshold | Typical |
+|---|---:|---:|
+| `fixtures/minimal/minimal.typ` | 1 s | ~16 ms |
+| `fixtures/equations/math-formulas.typ` | 5 s | ~21 ms |
+| `fixtures/real_vkr/main_doc/thesis.typ` | 10 s | ~24 ms |
+
+Run benchmarks and capture JSON output:
+
+```bash
+pytest benchmarks/ -v
+python benchmarks/compare.py            # human-readable trend report
+python benchmarks/compare.py --markdown # Markdown table for CI
+```
+
+## Validation and Strict Mode
+
+Every conversion reports undefined references (`@fig:missing`), unreferenced labels (`<fig:orphan>`), and missing bibliography entries with **file:line attribution**:
+
+```
+Validation report for thesis.typ
+
+Undefined references (errors):
+  WARNING: thesis.typ:42: @fig:missing
+  WARNING: thesis.typ:67: @tbl:comparison
+
+Unreferenced labels (info):
+  INFO: thesis.typ:15: <fig:orphan>
+
+No validation issues found.
+```
+
+```bash
+# Fail the build when undefined references exist:
+typst-gost-docx convert thesis.typ -o thesis.docx --strict
+# Exit code 1 if any undefined reference is detected.
+```
 ## Architecture
 
 The converter uses a 4-layer pipeline:

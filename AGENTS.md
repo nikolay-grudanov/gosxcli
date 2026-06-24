@@ -4,7 +4,7 @@
 
 **Typst GOST DOCX Converter (gosxcli)** — CLI инструмент для конвертации Typst документов в DOCX с поддержкой стилизации по ГОСТ 7.32-2017. Проект предназначен для академических документов, диссертаций и научных работ.
 
-**Status:** v0.4.0 (GOST Template Integration) — 262 tests passing, 0 ruff/mypy errors
+**Status:** v0.5.0 (Enhanced Academic Support) — 310 tests passing, 0 ruff/mypy errors
 
 **Tech Stack:** Python 3.12+, Typer, Pydantic v2, python-docx, lxml, Rich
 

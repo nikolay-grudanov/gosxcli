@@ -1,13 +1,20 @@
 # Project State: gosxcli
 
-**Last Updated:** 2026-05-29 (v0.4.0 → Spec 005 GOST Template Integration complete)
-**Version:** v0.4.0 (GOST Template Integration)
-**Status:** Spec 005-template-integration полностью реализован ✅ (Phase 1-6, T001-T024)
+**Last Updated:** 2026-06-24 (v0.5.0 → Spec 001 Enhanced Academic Support closed)
+**Version:** v0.5.0 (Enhanced Academic Support)
+**Status:** Spec 001-enhanced-academic-support полностью реализован ✅ (T001-T124 closed)
 
 ### Key Metrics
-- Lines of Code: ~5,800 (31 Python source files)
-- Test Files: 29
-- Test Cases: 262 (all passing)
+- Lines of Code: ~6,800 (35 Python source files)
+- Test Files: 33 (+ unit/regression/benchmark suites)
+- Test Cases: 310 (all passing, 0 ruff/mypy errors)
+
+### Spec 001 — Enhanced Academic Support (closed)
+- T073 + T078: Inline `#link()` rendered as `<w:hyperlink r:id>` with TargetMode="External" relationships.
+- T081, T083-T088: `ReferenceValidator` collects source locations; new `ValidationIssue` with file:line; `format_report` groups by kind and prints `path:N: @label`. Strict mode exits with code 1.
+- T103: `benchmarks/compare.py` reads `benchmarks/results/*.json`, groups by fixture, emits min/mean/max/stddev trend report. Old-schema files are skipped with a warning.
+- Regression suite (`tests/regression/`) compares output DOCX against golden files for `minimal`, `complex_table`, `equations`.
+- Benchmark suite (`benchmarks/test_benchmarks.py`) tracks conversion time against per-fixture thresholds (1 s / 5 s / 10 s).
 - Ruff Errors: 0
 - Mypy: Passing (0 errors)
 - Source Files: 31
@@ -275,9 +282,6 @@
 ## Next Steps
 
 ### ✅ Spec 005 — Полностью завершён
-- [x] **Пользователь предоставил шаблон** `Шаблон_оформления_ВКР_2026_новый.docx`
-- [x] Проанализировать стили через python-docx + XML
-- [x] Создать план интеграции (spec 005)
 - [x] Реализовать spec 005-template-integration Phase 1-2 (T001-T008)
 - [x] Реализовать spec 005 Phase 3 (T009-T013)
 - [x] Реализовать spec 005 Phase 4 (T014-T018)
@@ -285,20 +289,28 @@
 - [x] Очистка tmp-test/ и .gitignore
 - [x] Обновить state.md
 
+### ✅ Spec 001 — Полностью завершён
+- [x] T073 + T078: inline `#link()` parser + writer
+- [x] T081, T083-T088: validation with file:line, summary stats, dedicated report
+- [x] T089-T108: regression suite + benchmark suite + historical report
+- [x] T109-T113, T120: README, state.md, version bump
+- [x] Push 4 commits (984aac6, 2b25a1b, 5b2faeb, 6a0d002) → origin/001-enhanced-academic-support
+- [ ] Open PR → main
+
 ### Immediate
-- [ ] Создать PR для 005-template-integration → main
-- [ ] Рассмотреть тег v0.4.0
+- [ ] Open PR for 001-enhanced-academic-support → main
+- [ ] Consider git tag v0.5.0 after PR merge
 
-### Short Term (v0.4.x)
-1. Investigate XML double-escaping in _escape_xml_text
-2. Make latex2mathml/pygments optional dependencies
-3. Add tests for BookmarksManager, ImagesManager
-4. Clean up unused parser modules (typst_client, typst_query_parser, etc.)
-5. Deduplicate bibliography_style between Config and DocxWriter
+### Short Term (v0.5.x)
+1. Remove 5 dead parser modules (typst_client, typst_query_parser, unified_parser, regex_fallback_parser, labels)
+2. Make `latex2mathml`, `pygments` optional dependencies
+3. Add tests for `BookmarksManager`, `ImagesManager`
+4. Investigate XML double-escaping risk in `_escape_xml_text`
 
-### Medium Term (v0.5)
-6. Implement spec 001 (Enhanced Academic Support)
-7. Real TOC field generation
+### Medium Term (v0.6)
+5. Real TOC field generation (replace placeholder with `<w:fldChar>`)
+6. Full GOST 7.32-2017 compliance audit
+7. Better error handling for edge cases in `#include` parsing
 8. Full GOST 7.32-2017 compliance
 9. Code blocks with syntax highlighting improvements
 10. Better error handling for edge cases
