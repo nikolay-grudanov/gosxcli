@@ -27,9 +27,9 @@ from ..ir.model import (
     TextRun,
     InlineRunNode,
     InlineCodeNode,
+    InlineMathNode,
     CodeBlockNode,
     NumberingKind,
-    ListKind,
     CitationStyle,
     ChapterContext,
     ValidationResult,
@@ -70,6 +70,9 @@ class DocxWriter:
         self.bookmarks_manager = BookmarksManager()
         self.images_manager = ImagesManager(base_dir=base_dir)
         self.tables_manager = TablesManager()
+        from .lists import ListsManager
+
+        self.lists_manager: Optional[ListsManager] = None
         self.chapter_context = ChapterContext()
         self.ref_labels = ref_labels or RefLabels()
         self.label_number_map: dict[str, tuple[int, int]] = {}  # label → (chapter_number, number)
@@ -114,6 +117,9 @@ class DocxWriter:
     def write(self, ir_document: IRDocument, output_path: Path) -> dict[str, Any]:
         self.doc = load_document(self.reference_doc)
         self.style_resolver = StyleResolver(self.doc)
+        from .lists import ListsManager  # lazy: avoid circular import
+
+        self.lists_manager = ListsManager(self.doc)
 
         self._write_document(ir_document)
 
@@ -292,6 +298,8 @@ class DocxWriter:
                 except KeyError:
                     # Fallback: use Courier font if Code style doesn't exist
                     run.font.name = "Courier New"
+            elif isinstance(node, InlineMathNode):
+                self._write_inline_math(para, node.latex)
             elif isinstance(node, CrossReference):
                 self._write_cross_reference(node, para)
             elif isinstance(node, CitationNode):
@@ -301,16 +309,9 @@ class DocxWriter:
 
     def _write_list(self, list_block: ListBlock) -> None:
         assert self.doc is not None, "Document not initialized"
-
-        # Resolve list style using StyleResolver
-        ir_type = "list_bullet" if list_block.kind == ListKind.BULLET else "list_number"
-        list_style = self.style_resolver.resolve(ir_type)
-
-        for item in list_block.items:
-            text = self._nodes_to_text(item.content)
-            para = self.doc.add_paragraph(text)
-            if list_style:
-                self.style_resolver.apply_paragraph_style(para, list_style)
+        assert self.lists_manager is not None, "ListsManager not initialized"
+        self.lists_manager.write_list(list_block)
+        self.stats["lists"] = self.stats.get("lists", 0) + 1
 
     def _write_figure(self, figure: Figure) -> None:
         assert self.doc is not None, "Document not initialized"

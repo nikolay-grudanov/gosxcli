@@ -13,6 +13,7 @@ from ..ir.model import (
     TextRun,
     InlineRunNode,
     InlineCodeNode,
+    InlineMathNode,
     InlineNode,
     ListBlock,
     ListItem,
@@ -245,6 +246,14 @@ class TypstExtractorV2:
                     nodes.append(ref)
             elif token.type == "LABEL":
                 self._process_label()
+            elif token.type == "INLINE_MATH_DELIM":
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                math = self._extract_inline_math()
+                if math is not None:
+                    nodes.append(math)
             else:
                 current_text += token.value
                 self.pos += 1
@@ -253,6 +262,43 @@ class TypstExtractorV2:
             nodes.extend(self._parse_inline_formatting(current_text))
 
         return nodes
+
+    def _extract_inline_math(self) -> Optional[InlineMathNode]:
+        """Parse ``$...$`` into an ``InlineMathNode``.
+
+        Consumes the opening ``$``, then walks tokens until the next
+        ``INLINE_MATH_DELIM`` (``$``) or a newline, accumulating raw text
+        into ``latex``. Nested ``$`` is not supported — Typst does not
+        allow it either, but neither does our scanner.
+        """
+        if self.pos >= len(self.tokens):
+            return None
+        if self.tokens[self.pos].type != "INLINE_MATH_DELIM":
+            return None
+        # Consume the opening '$'.
+        self.pos += 1
+
+        latex_parts: list[str] = []
+        while self.pos < len(self.tokens):
+            tok = self.tokens[self.pos]
+            if tok.type == "INLINE_MATH_DELIM":
+                # Consume the closing '$' and stop.
+                self.pos += 1
+                break
+            if tok.type == "NEWLINE":
+                # Unterminated inline math — bail out, leave closing '$' for next pass.
+                break
+            latex_parts.append(tok.value)
+            self.pos += 1
+
+        latex = "".join(latex_parts).strip()
+        if not latex:
+            return None
+        return InlineMathNode(
+            node_type=NodeType.INLINE_MATH,
+            id=str(uuid.uuid4()),
+            latex=latex,
+        )
 
     def _extract_list(self) -> Optional[ListBlock]:
         """Extract list from tokens.
@@ -517,7 +563,7 @@ class TypstExtractorV2:
         token = self.tokens[self.pos]
         self.pos += 1
 
-        latex = self._get_text_until_block_math_end()
+        latex = self._get_text_until_block_math_end().strip()
 
         equation = Equation(
             id=str(uuid.uuid4()),
