@@ -31,6 +31,24 @@ Production-ready tool for converting Typst academic documents (especially those 
 
 ## Installation
 
+**Python 3.12 is required.** CI runs on Python 3.12.13 and the project
+pins this version in `.python-version` so `pyenv` and `uv` pick it up
+automatically. Running on 3.13 or 3.14 will pass locally but fail in CI
+because of subtle mypy / python-docx type differences.
+
+```bash
+# If you don't have 3.12 yet, install it via uv (or pyenv):
+uv python install 3.12
+
+# Then create the venv pinned to 3.12 and install the project:
+uv venv --python 3.12 .venv
+source .venv/bin/activate
+uv pip install -e ".[dev,math]"
+
+# Or with make (uses your existing Python — pin it first):
+make install-dev
+```
+
 ```bash
 pip install -e .
 ```

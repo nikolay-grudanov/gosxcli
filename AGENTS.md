@@ -198,6 +198,26 @@ As shown in @fig:results, the results are promising.
 
 ## Development Workflow
 
+### Python version
+
+The project targets **Python 3.12** — the same version CI runs. Pin it
+locally via `.python-version` (picked up automatically by `pyenv` and
+`uv python pin`). Mismatched local versions are the most common cause
+of "passes for me, fails in CI" surprises because mypy and python-docx
+behave differently across Python releases.
+
+```bash
+# First-time setup with the correct interpreter
+uv python install 3.12
+uv venv --python 3.12 .venv
+source .venv/bin/activate
+uv pip install -e ".[dev,math]"
+```
+
+If you only have system Python 3.13, install Python 3.12 first via
+`uv python install 3.12` (or `pyenv install 3.12.13`). Don't run the
+test suite with a different interpreter than CI.
+
 ### Quality Checks
 
 Перед коммитом обязательно:
