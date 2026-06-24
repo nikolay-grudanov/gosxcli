@@ -38,6 +38,8 @@ class TypstScanner:
             ("TABLE_START", r"(\n  table\()"),  # nested (normalize)
             ("OUTLINE_START", r"#outline\("),
             ("BIBLIOGRAPHY_START", r'#bibliography\s*\("([^"]+)"\)'),  # Bibliography file loading
+            # #link("url")[label] or #link("url") — both as inline link tokens
+            ("LINK_START", r'#link\("([^"]*)"\)'),
             ("CODE_BLOCK_DELIM", r"```[a-zA-Z]*"),  # Code block delimiter with optional language
             ("HEADING", r"={1,6}\s+"),
             ("BULLET", r"-\s"),
