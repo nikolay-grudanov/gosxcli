@@ -2,9 +2,11 @@
 
 Typst to DOCX converter for academic documents with GOST styling support.
 
-## Status: v0.3.0 (Syntax Highlighting)
+## Status: v0.4.0 (GOST Template Integration)
 
 Production-ready tool for converting Typst academic documents (especially those using `@preview/modern-g7-32`) to editable DOCX files while preserving structure, references, tables, images, and applying GOST-compliant styling.
+
+**v0.4.0 highlights:** Built-in ГОСТ 7.32-2017 reference template (Times New Roman, 14pt, black headings), `--reference-doc` CLI flag for custom templates, and StyleResolver with iterative fallback for non-standard style_id's (e.g. Heading 1 → "781").
 
 ## Features
 
@@ -383,7 +385,25 @@ See `docs/roadmap.md` for future plans.
 - ✅ Bibliography support
 - ✅ Page breaks and section formatting
 - ✅ More robust error handling
-- ✅ Full GOST 7.32-2017 compliance
+
+### v0.3.1 (Completed ✅)
+- ✅ MathML → OMML conversion (`writers/mml2omml.py`)
+- ✅ Font Normal: Times New Roman 14pt
+- ✅ Heading color: black (no more blue)
+- ✅ Heading numbering: hierarchical (1, 1.1, 1.1.1)
+- ✅ Inline math rendering (`$...$` inside text)
+- ✅ Cross-reference number resolution (label_number_map)
+- ✅ Image path resolution for chapters
+- ✅ Bibliography citation recognition (vs. cross-refs)
+- ✅ Fallback style creation when missing in template
+
+### v0.4 (Completed ✅)
+- ✅ GOST 7.32-2017 reference template bundled (`templates/*.docx`)
+- ✅ StyleResolver with iterative lookup + fuzzy fallback
+- ✅ Custom DOCX template via `--reference-doc`
+- ✅ Special styles: `Заг_не_содержание` (ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ), `Подпись рисунков`, `Таблица название`, `Формулы`
+- ✅ Template fallback chain: custom → built-in → `Document()`
+- ✅ Monkeypatch for python-docx BabelFish bug with non-standard style_id's
 
 ## Limitations
 

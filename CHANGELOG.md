@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-29
+
+### 🎉 GOST Template Integration (spec 005)
+
+Интеграция референсного ГОСТ 7.32-2017 шаблона как встроенного шаблона по умолчанию и поддержка пользовательских шаблонов через `--reference-doc`.
+
+### ✨ New Features
+
+#### Встроенный ГОСТ-шаблон
+- Бандл `templates/*.docx` (Шаблон_оформления_ВКР_2026_новый.docx) — Times New Roman 14pt, чёрные заголовки
+- `pyproject.toml` включает `templates/*.docx` через `package-data`
+- Шаблон доступен через `importlib.resources` без внешних файлов
+
+#### StyleResolver с итеративным fallback
+- Итеративный lookup по стилям + кэширование
+- Fuzzy fallback для нестандартных `style_id` (Heading 1 → "781" в шаблоне ВКР)
+- Обход `python-docx` BabelFish bug с нестандартными ID через monkeypatch `Styles.__getitem__`
+
+#### Template fallback chain
+- `load_document()`: `--reference-doc` (custom) → встроенный ГОСТ → `Document()` fallback
+- `_configure_styles()` полностью удалён из `DocxWriter` (больше не нужен)
+- `initialize_fallback_styles()` для случая fallback на `Document()`
+
+#### Специальные стили шаблона
+- `_is_unnumbered_heading()`: ВВЕДЕНИЕ / ЗАКЛЮЧЕНИЕ → стиль `Заг_не_содержание`
+- Подписи рисунков → стиль `Подпись рисунков`
+- Подписи таблиц → стиль `Таблица название`
+- Формулы → стиль `Формулы`
+- Таблицы → `Table Grid` из шаблона (с обработкой KeyError)
+
+#### CLI: `--reference-doc`
+- Пользовательский шаблон через CLI-флаг
+- Template info (path + source) в `_print_summary()`
+
+### 🔧 Verification
+
+- ruff check: ✅ All checks passed
+- mypy --strict: ✅ 0 errors in 32 files
+- pytest: ✅ 262 passed
+- E2E конвертация с шаблоном верифицирована
+
+### 📊 Metrics
+
+| Metric | Value |
+|--------|-------|
+| Lines of Code | ~5,800 |
+| Source Files | 31 |
+| Test Files | 29 |
+| Test Cases | 262 |
+
+## [0.3.1] - 2026-05-12
+
+### 🐛 Bug Fixes
+
+#### Parser
+1. **OMML rendering** — MathML → OMML конвертер (`writers/mml2omml.py`)
+2. **Label misattribution** — whitespace token skipping перед LABEL check
+3. **Table not parsed** — автоматически исправлен фиксом label
+4. **Ref colon support** — scanner поддерживает `@tbl:test`, `@eq:formula`
+
+#### Style & Formatting
+5. **Font Normal** — Times New Roman 14pt через `_configure_styles()` + XML rFonts
+6. **Heading color** — чёрный вместо синего (`RGBColor(0,0,0)`)
+7. **Heading font** — Times New Roman через XML rFonts для Heading 1-3
+8. **Heading numbering** — иерархическая нумерация (1, 1.1, 1.1.1) через `heading_counters`
+9. **Inline math** — `_write_text_with_inline_math()` для `$...$` внутри текста
+10. **Cross-reference resolution** — `label_number_map` для номеров фигур/таблиц/формул
+11. **Image path resolution** — `base_dir` в `ImagesManager`, резолвинг относительно `input_file.parent`
+12. **Test image** — `fixtures/minimal/test.png` (200×100 PNG)
+
+#### Real Thesis Fixes
+13. **Image path resolution for chapters** — `_rewrite_image_paths()` в `project_loader.py`
+14. **Bibliography citation recognition** — параметр `bib_keys` в `TypstExtractorV2` для отличия цитирований `@key` от cross-refs
+15. **Missing styles fallback** — `_create_fallback_style()` в `StyleResolver` для динамического создания List Bullet / List Number / Heading N при отсутствии в шаблоне
+
 ## [0.3.0] - 2026-05-12
 
 ### ✨ Syntax Highlighting
