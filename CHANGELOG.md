@@ -5,7 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-24
+
+### 🎉 Enhanced Academic Support (spec 001 closed)
+
+Closes spec 001 (T001-T124) — the v0.2-era roadmap for full academic document support. Most tasks were already shipped through the v0.4.x cross-reference, list, math, and template work; this release adds the missing piece and finalises the polish.
+
+### ✨ New Features
+
+- **Inline hyperlinks** (`#link("url")[label]`) rendered as real `<w:hyperlink r:id>` elements with `TargetMode="External"` relationships. URLs survive round-tripping through Microsoft Word.
+- **Source-attributed validation**: `ReferenceValidator` now tracks source locations for every defined label, reference, and citation. The validation report prints `path:N: @label` instead of a bare `@label`.
+- **Dedicated report generator** in `parser/refs.py::RefResolver.build_validation_report` that lifts resolver warnings back into structured `ValidationIssue` entries.
+- **Validation summary statistics**: `get_validation_summary()` now includes `citation_keys_total/_defined/_missing` alongside the existing label/reference counts.
+- **Benchmark history** via `benchmarks/compare.py` — reads `benchmarks/results/*.json`, groups by fixture, emits min/mean/max/stddev per fixture in either console or Markdown form.
+- **`pytest-benchmark` integration**: conversion timings for `minimal`, `math_formulas`, `real_vkr` are now part of the test suite with per-fixture thresholds (1 s / 5 s / 10 s).
+
+### 🐛 Bug Fixes
+
+- Inline math `$E = mc^2$` is now extracted into a proper `InlineMathNode` (was previously emitted as plain text).
+- Block equation latex no longer carries leading/trailing newlines that broke `latex2mathml`.
+- `_extract_ref` now sets `source_location` on every `CrossReference`, so validation reports can pinpoint the offending source line.
+
+### 🔧 Improvements
+
+- CLI no longer duplicates `WARNING: Unresolved reference` logs — `ReferenceValidator` is now the single source of truth and logs each issue with its source location.
+- `ValidationResult.format_report()` supports both the legacy `set[str]` API and the new rich `ValidationIssue` list, so callers upgrade at their own pace.
+
+### 📊 Metrics
+
+| Metric | Value |
+|---|---|
+| Lines of Code | ~6,800 |
+| Source Files | 35 |
+| Test Files | 33 |
+| Test Cases | 310 (262 → 310, +48) |
+| Regression fixtures | 3 (minimal, complex_table, equations) |
+| Benchmark fixtures | 3 (with thresholds) |
+
 ## [0.4.0] - 2026-05-29
+
+### 🎉 Syntax Highlighting
+
+- Pygments-based syntax highlighting for code blocks
+- VS Code Dark+ color scheme
+- Support for Python, Rust, JavaScript, C, C++, Go
+- Colored keywords, strings, comments, numbers, functions
+- Dark background (#1E1E1E) for code blocks
+- Monospace font (Courier New, 9pt)
 
 ### 🎉 GOST Template Integration (spec 005)
 

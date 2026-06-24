@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from lxml import etree  # type: ignore[import-untyped]
+from lxml import etree
 
 from docx.oxml.ns import qn
 

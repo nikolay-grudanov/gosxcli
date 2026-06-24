@@ -4,7 +4,7 @@
 
 **Typst GOST DOCX Converter (gosxcli)** — CLI инструмент для конвертации Typst документов в DOCX с поддержкой стилизации по ГОСТ 7.32-2017. Проект предназначен для академических документов, диссертаций и научных работ.
 
-**Status:** v0.4.0 (GOST Template Integration) — 262 tests passing, 0 ruff/mypy errors
+**Status:** v0.5.0 (Enhanced Academic Support) — 310 tests passing, 0 ruff/mypy errors
 
 **Tech Stack:** Python 3.12+, Typer, Pydantic v2, python-docx, lxml, Rich
 
@@ -198,6 +198,31 @@ As shown in @fig:results, the results are promising.
 
 ## Development Workflow
 
+### Python version
+
+The project is **tested on Python 3.12** — the same version CI runs.
+The declared `requires-python` is `">=3.12"` so 3.13+ will install, but
+mypy and python-docx behave slightly differently across Python
+releases, so a green local run on 3.13 is not a guarantee of a green
+CI run on 3.12. The project pins the recommended version in
+`.python-version` (picked up automatically by `pyenv` and
+`uv python pin`) to keep local and CI in sync without manual
+flag-passing.
+
+```bash
+# First-time setup with the correct interpreter
+uv python install 3.12
+uv venv --python 3.12 .venv
+source .venv/bin/activate
+uv pip install -e ".[dev,math]"
+```
+
+If you only have Python 3.13 (or newer) on your system, install 3.12
+alongside it via `uv python install 3.12` (or `pyenv install 3.12.13`)
+and use the 3.12 venv for this project. The recommended setup keeps
+local and CI in sync — running tests on 3.13 may pass locally but
+fail in CI due to subtle mypy / python-docx type differences.
+
 ### Quality Checks
 
 Перед коммитом обязательно:
@@ -231,7 +256,6 @@ typst-gost-docx convert thesis.typ -o thesis.docx --debug --dump-ir
 Открытые проблемы (полный список — в `state.md`):
 - **P1:** Python 3.14 не тестировался (проект requires >=3.12)
 - **P2:** Нет тестов для `BookmarksManager`, `ImagesManager`
-- **P2:** 5 неиспользуемых parser-модулей (`typst_client`, `typst_query_parser`, `unified_parser`, `regex_fallback_parser`, `labels`)
 - **P2:** TOC — placeholder, не реальный Word field
 - **P2:** XML double-escaping риск в `_escape_xml_text`
 - **P2:** `latex2mathml`, `pygments` обязательные зависимости (лучше optional)

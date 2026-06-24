@@ -14,6 +14,7 @@ from ..ir.model import (
     InlineRunNode,
     InlineCodeNode,
     InlineMathNode,
+    InlineLinkNode,
     InlineNode,
     ListBlock,
     ListItem,
@@ -254,6 +255,23 @@ class TypstExtractorV2:
                 math = self._extract_inline_math()
                 if math is not None:
                     nodes.append(math)
+            elif token.type == "LINK_START":
+                if current_text.strip():
+                    nodes.extend(self._parse_inline_formatting(current_text))
+                    current_text = ""
+
+                link_or_result = self._extract_link()
+                if link_or_result is None:
+                    pass
+                else:
+                    trailing_text = ""
+                    if isinstance(link_or_result, tuple):
+                        link, trailing_text = link_or_result
+                        nodes.append(link)
+                    else:
+                        nodes.append(link_or_result)
+                    if trailing_text:
+                        current_text += trailing_text
             else:
                 current_text += token.value
                 self.pos += 1
@@ -299,6 +317,68 @@ class TypstExtractorV2:
             id=str(uuid.uuid4()),
             latex=latex,
         )
+
+    def _extract_link(self) -> "InlineLinkNode | tuple[InlineLinkNode, str] | None":
+        """Parse ``#link("url")`` or ``#link("url")[label]`` into an InlineLinkNode.
+
+        The scanner emits a ``LINK_START`` token carrying the URL. We
+        consume that token, then walk ahead to look for an optional
+        bracketed label ``[text]`` that follows it. The return type
+        varies so the caller can recover trailing characters that
+        follow the closing ``]`` (e.g. punctuation):
+          * ``InlineLinkNode`` — label was missing, or no trailing text
+          * ``(node, trailing)`` — label consumed, ``trailing`` is text
+            that appeared after ``]`` and must be re-emitted as plain text
+          * ``None`` — not at a link token
+        """
+        if self.pos >= len(self.tokens):
+            return None
+        token = self.tokens[self.pos]
+        if token.type != "LINK_START":
+            return None
+
+        # Pull the URL out of the token value: "#link(\"url\")" → "url"
+        raw = token.value
+        match = re.match(r'#link\("([^"]*)"\)', raw)
+        url = match.group(1) if match else ""
+
+        # Consume the LINK_START token.
+        self.pos += 1
+
+        label = ""
+        trailing = ""
+        if self.pos < len(self.tokens) and self.tokens[self.pos].type == "TEXT":
+            head = self.tokens[self.pos].value
+            bracket_match = re.match(r"^\s*\[\s*(.*?)\s*\]\s*(.*)$", head, flags=re.DOTALL)
+            if bracket_match is not None:
+                label = bracket_match.group(1)
+                trailing = bracket_match.group(2)
+                self.pos += 1
+            elif head.lstrip().startswith("["):
+                collected: list[str] = []
+                depth = head.count("[") - head.count("]")
+                collected.append(head)
+                self.pos += 1
+                while self.pos < len(self.tokens) and depth > 0:
+                    nxt = self.tokens[self.pos]
+                    collected.append(nxt.value)
+                    depth += nxt.value.count("[") - nxt.value.count("]")
+                    self.pos += 1
+                joined = "".join(collected)
+                bracket_match = re.match(r"^\s*\[\s*(.*?)\s*\]\s*(.*)$", joined, flags=re.DOTALL)
+                if bracket_match is not None:
+                    label = bracket_match.group(1)
+                    trailing = bracket_match.group(2)
+
+        node = InlineLinkNode(
+            node_type=NodeType.INLINE_LINK,
+            id=str(uuid.uuid4()),
+            url=url,
+            text=label,
+        )
+        if trailing:
+            return node, trailing
+        return node
 
     def _extract_list(self) -> Optional[ListBlock]:
         """Extract list from tokens.
@@ -802,6 +882,9 @@ class TypstExtractorV2:
                 node_type=NodeType.CROSS_REFERENCE,
                 id=str(uuid.uuid4()),
                 target_label=target_label,
+                source_location=SourceLocation(
+                    file_path=self.file_path, line=token.line, column=token.column
+                ),
             )
 
             self.pos += 1

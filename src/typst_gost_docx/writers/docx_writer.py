@@ -6,6 +6,7 @@ from typing import Any, Optional, Sequence
 from docx.document import Document as _Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.shared import Inches
 from docx.text.paragraph import Paragraph as DocxParagraph
 from ..ir.model import (
@@ -28,6 +29,7 @@ from ..ir.model import (
     InlineRunNode,
     InlineCodeNode,
     InlineMathNode,
+    InlineLinkNode,
     CodeBlockNode,
     NumberingKind,
     CitationStyle,
@@ -258,6 +260,52 @@ class DocxWriter:
         run = para.add_run(f"${latex}$")
         run.italic = True
 
+    def _write_link(self, link: InlineLinkNode, para: DocxParagraph) -> None:
+        """Emit an external hyperlink as ``<w:hyperlink r:id="...">``.
+
+        The link's URL is registered as a relationship on the document
+        part, then a hyperlinked run is appended to the paragraph with
+        the standard blue-underline styling so it is visually
+        recognisable as a link in Word and LibreOffice.
+        """
+        assert self.doc is not None, "Document not initialized"
+
+        # Fallback: empty URL → just emit the visible text as plain run.
+        if not link.url:
+            if link.text:
+                para.add_run(link.text)
+            return
+
+        # Register the URL as a relationship. ``relate_to`` with
+        # ``is_external=True`` writes a TargetMode="External" entry
+        # to word/_rels/document.xml.rels and returns a stable rId.
+        r_id = self.doc.part.relate_to(link.url, RT.HYPERLINK, is_external=True)
+
+        hyperlink = OxmlElement("w:hyperlink")
+        hyperlink.set(qn("r:id"), r_id)
+
+        run = OxmlElement("w:r")
+        r_pr = OxmlElement("w:rPr")
+
+        # Blue + underline so the link is visually obvious.
+        color = OxmlElement("w:color")
+        color.set(qn("w:val"), "0000FF")
+        r_pr.append(color)
+        underline = OxmlElement("w:u")
+        underline.set(qn("w:val"), "single")
+        r_pr.append(underline)
+
+        run.append(r_pr)
+        text_el = OxmlElement("w:t")
+        text_el.text = link.text or link.url
+        text_el.set(qn("xml:space"), "preserve")
+        run.append(text_el)
+
+        hyperlink.append(run)
+        para._element.append(hyperlink)
+
+        self.stats["links"] = self.stats.get("links", 0) + 1
+
     def _write_text_with_inline_math(self, para: DocxParagraph, text: str) -> None:
         """Разбивает текст на обычные фрагменты и inline math ($...$).
 
@@ -300,6 +348,8 @@ class DocxWriter:
                     run.font.name = "Courier New"
             elif isinstance(node, InlineMathNode):
                 self._write_inline_math(para, node.latex)
+            elif isinstance(node, InlineLinkNode):
+                self._write_link(node, para)
             elif isinstance(node, CrossReference):
                 self._write_cross_reference(node, para)
             elif isinstance(node, CitationNode):
@@ -846,7 +896,12 @@ class DocxWriter:
             # to compute it, otherwise fall back to the raw label so the bug
             # stays visible in QA rather than silently disappearing.
             visible = ref_text or ref.target_label
-            run = para.add_run(visible)
+            # ``run`` from the ``if`` branch above is an ``OxmlElement``
+            # (lxml), and reusing the same name here would trip mypy's
+            # no-redef check. Discard the new Run immediately — the text
+            # is appended to the paragraph as a side-effect of add_run.
+            _unused: Any = para.add_run(visible)
+            del _unused
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
@@ -997,7 +1052,10 @@ class DocxWriter:
             # Apply dark background shading
             shading_elm = OxmlElement("w:shd")
             shading_elm.set(qn("w:fill"), "1E1E1E")
-            para._element.get_or_add_pPr().insert_element_before(shading_elm, "w:spacing")
+            # Same python-docx / lxml ElementBase vs _Element mismatch as
+            # in code_highlighter — see comment there.
+            pPr: Any = para._element.get_or_add_pPr()
+            pPr.insert_element_before(shading_elm, "w:spacing")
 
             # Escape XML special characters
             escaped_line = self._escape_xml_text(line)
