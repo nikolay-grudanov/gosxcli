@@ -23,7 +23,11 @@ See @missing for details.
         # Записываем тестовый Typst файл
         typst_file.write_text(typst_content, encoding="utf-8")
 
-        # Запускаем CLI с флагом --strict
+        # Run the CLI as a subprocess. ``cwd=None`` inherits pytest's
+        # working directory — on CI that's ``$GITHUB_WORKSPACE`` so the
+        # project root is found automatically. Previously this test
+        # hard-coded ``/home/gna/projects/gosxcli`` which failed on any
+        # machine where that absolute path did not exist.
         result = subprocess.run(
             [
                 "python",
@@ -36,7 +40,7 @@ See @missing for details.
             ],
             capture_output=True,
             text=True,
-            cwd="/home/gna/workspase/projects/gosxcli",
+            cwd=None,
         )
 
         # Проверяем что exit code = 1 (ошибка)
@@ -67,7 +71,6 @@ See @fig for details.
         # Записываем тестовый Typst файл
         typst_file.write_text(typst_content, encoding="utf-8")
 
-        # Запускаем CLI с флагом --strict
         result = subprocess.run(
             [
                 "python",
@@ -80,7 +83,7 @@ See @fig for details.
             ],
             capture_output=True,
             text=True,
-            cwd="/home/gna/workspase/projects/gosxcli",
+            cwd=None,
         )
 
         # Проверяем что exit code = 0 (успех)
@@ -123,7 +126,7 @@ See @missing for details.
             ],
             capture_output=True,
             text=True,
-            cwd="/home/gna/workspase/projects/gosxcli",
+            cwd=None,
         )
 
         # Проверяем что exit code = 0 (успех, несмотря на undefined reference)

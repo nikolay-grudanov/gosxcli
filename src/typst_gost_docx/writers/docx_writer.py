@@ -896,7 +896,12 @@ class DocxWriter:
             # to compute it, otherwise fall back to the raw label so the bug
             # stays visible in QA rather than silently disappearing.
             visible = ref_text or ref.target_label
-            run = para.add_run(visible)
+            # ``run`` from the ``if`` branch above is an ``OxmlElement``
+            # (lxml), and reusing the same name here would trip mypy's
+            # no-redef check. Discard the new Run immediately — the text
+            # is appended to the paragraph as a side-effect of add_run.
+            _unused: Any = para.add_run(visible)
+            del _unused
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
@@ -1047,7 +1052,10 @@ class DocxWriter:
             # Apply dark background shading
             shading_elm = OxmlElement("w:shd")
             shading_elm.set(qn("w:fill"), "1E1E1E")
-            para._element.get_or_add_pPr().insert_element_before(shading_elm, "w:spacing")
+            # Same python-docx / lxml ElementBase vs _Element mismatch as
+            # in code_highlighter — see comment there.
+            pPr: Any = para._element.get_or_add_pPr()
+            pPr.insert_element_before(shading_elm, "w:spacing")
 
             # Escape XML special characters
             escaped_line = self._escape_xml_text(line)
