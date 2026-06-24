@@ -1,84 +1,154 @@
-"""Resolve references with chapter-aware numbering."""
+"""Resolve references with chapter-aware numbering.
 
-from typing import Optional
+Single resolver for the canonical ``CrossReference`` IR node. Walks the entire
+document tree (including nested Paragraph.runs and Section.children) and
+populates ``ref_kind``, ``number``, ``chapter_number`` and ``ref_text`` on
+every reference.
+
+``ref_text`` is what the writer renders as the visible hyperlink text. By
+computing it here we eliminate a class of bugs where the writer had to
+re-implement resolution with its own label-number map.
+"""
+
+from typing import Iterator, Optional, Sequence
 
 from ..ir.model import (
     BaseNode,
     CrossReference,
-    CrossRefMap,
-    CrossRefNode,
-    Figure,
-    TableNode,
-    Equation,
+    Document,
+    Paragraph,
     Section,
 )
 from ..utils.ref_utils import infer_ref_kind
 
 
+_REF_TEXT_TEMPLATES: dict[str, str] = {
+    "fig": "Рис. {chapter}.{number}",
+    "tbl": "Табл. {chapter}.{number}",
+    "eq": "Формула {chapter}.{number}",
+    "section": "Раздел {chapter}.{number}",
+}
+
+
 class RefResolver:
-    def __init__(self, cross_ref_map: CrossRefMap):
+    """Resolves every ``CrossReference`` in a document.
+
+    Builds a label map by traversing the document (figures, tables, equations,
+    sections), then fills the matching fields on each ``CrossReference`` it
+    finds. Unresolved references are reported as warnings but do not raise.
+    """
+
+    def __init__(self, cross_ref_map: Optional[object] = None) -> None:
+        # cross_ref_map kept for legacy callers; we rebuild the map from the
+        # document directly so callers can pass `None` or omit the argument.
         self.cross_ref_map = cross_ref_map
 
-    def _infer_ref_kind(self, label: str) -> Optional[str]:
-        """Инферирует тип ссылки по префиксу метки.
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def resolve_document(self, document: Document) -> list[str]:
+        """Resolve every reference inside ``document.blocks``.
 
-        Args:
-            label: Метка ссылки (например, fig:results).
-
-        Returns:
-            Тип ссылки (fig, tbl, eq) или None.
+        Returns a list of human-readable warnings for unresolved references.
         """
-        return infer_ref_kind(label)
-
-    def resolve_refs(self, nodes: list[BaseNode]) -> list[str]:
-        """Разрешает ссылки и заполняет ref_kind, number, chapter_number в CrossRefNode.
-
-        Args:
-            nodes: Список IR узлов для обработки ссылок.
-
-        Returns:
-            Список предупреждений о неразрешённых ссылках.
-        """
-        warnings = []
-
-        for node in nodes:
-            if isinstance(node, CrossReference):
-                target = self.cross_ref_map.resolve(node.target_label)
-                if target is None:
-                    warnings.append(f"Unresolved reference: @{node.target_label}")
-            elif isinstance(node, CrossRefNode):
-                # Resolve reference and populate ref_kind, number, chapter_number
-                self._resolve_cross_ref_node(node)
-                target = self.cross_ref_map.resolve(node.target_label)
-                if target is None:
-                    warnings.append(f"Unresolved reference: @{node.target_label}")
-
+        label_map = self._build_label_map(document)
+        warnings: list[str] = []
+        for ref in self._iter_references(document.blocks):
+            warning = self._resolve_one(ref, label_map)
+            if warning is not None:
+                warnings.append(warning)
         return warnings
 
-    def _resolve_cross_ref_node(self, ref: CrossRefNode) -> None:
-        """Заполняет ref_kind, number, chapter_number в CrossRefNode.
+    # Backwards-compatible shim used by ``validator.py`` and tests.
+    def resolve_refs(self, nodes: Sequence[BaseNode]) -> list[str]:
+        label_map = self._build_label_map_from_nodes(nodes)
+        warnings: list[str] = []
+        for ref in self._iter_references(nodes):
+            warning = self._resolve_one(ref, label_map)
+            if warning is not None:
+                warnings.append(warning)
+        return warnings
 
-        Определяет тип ссылки по префиксу метки и извлекает номер из целевого узла.
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _iter_references(nodes: Sequence[BaseNode]) -> Iterator[BaseNode]:
+        """Yield every CrossReference nested inside ``nodes``."""
+        for node in nodes:
+            yield from RefResolver._walk(node)
 
-        Args:
-            ref: CrossRefNode для разрешения.
-        """
-        # Determine ref_kind from label prefix if not set
+    @staticmethod
+    def _walk(node: BaseNode) -> Iterator[BaseNode]:
+        if isinstance(node, CrossReference):
+            yield node
+        elif isinstance(node, Document):
+            yield from RefResolver._walk_blocks(node.blocks)
+        elif isinstance(node, Section):
+            yield from RefResolver._walk_blocks(node.blocks)
+        elif isinstance(node, Paragraph):
+            runs = getattr(node, "runs", None) or []
+            for run in runs:
+                yield from RefResolver._walk(run)
+
+    @staticmethod
+    def _walk_blocks(blocks: Sequence[BaseNode]) -> Iterator[BaseNode]:
+        for b in blocks:
+            yield from RefResolver._walk(b)
+
+    @staticmethod
+    def _build_label_map(document: Document) -> dict[str, BaseNode]:
+        return RefResolver._build_label_map_from_nodes(document.blocks)
+
+    @staticmethod
+    def _build_label_map_from_nodes(nodes: Sequence[BaseNode]) -> dict[str, BaseNode]:
+        labels: dict[str, BaseNode] = {}
+        for node in nodes:
+            RefResolver._collect_labels(node, labels)
+        return labels
+
+    @staticmethod
+    def _collect_labels(node: BaseNode, out: dict[str, BaseNode]) -> None:
+        label = getattr(node, "label", None)
+        if label and label not in out:
+            out[label] = node
+        if isinstance(node, Document):
+            for b in node.blocks:
+                RefResolver._collect_labels(b, out)
+        elif isinstance(node, Section):
+            for b in node.blocks:
+                RefResolver._collect_labels(b, out)
+        elif isinstance(node, Paragraph):
+            for run in getattr(node, "runs", None) or []:
+                RefResolver._collect_labels(run, out)
+
+    @staticmethod
+    def _resolve_one(ref: BaseNode, label_map: dict[str, BaseNode]) -> Optional[str]:
+        if not isinstance(ref, CrossReference):
+            return None
         if not ref.ref_kind:
-            ref.ref_kind = infer_ref_kind(ref.target_label)
+            ref.ref_kind = infer_ref_kind(ref.target_label) or ""
+        target = label_map.get(ref.target_label)
+        if target is None:
+            return f"Unresolved reference: @{ref.target_label}"
 
-        # Resolve target node to get number and chapter_number
-        target = self.cross_ref_map.resolve(ref.target_label)
-        if target:
-            if isinstance(target, Figure):
-                ref.number = target.number
-                ref.chapter_number = target.chapter_number
-            elif isinstance(target, TableNode):
-                ref.number = target.number
-                ref.chapter_number = target.chapter_number
-            elif isinstance(target, Equation):
-                ref.number = target.number
-                ref.chapter_number = target.chapter_number
-            elif isinstance(target, Section):
-                ref.number = target.number
-                ref.chapter_number = target.chapter_number
+        chapter_number, number = RefResolver._extract_numbers(target)
+        ref.number = number
+        ref.chapter_number = chapter_number
+        if ref.ref_kind and chapter_number > 0 and number > 0:
+            template = _REF_TEXT_TEMPLATES.get(ref.ref_kind)
+            if template is not None:
+                ref.ref_text = template.format(chapter=chapter_number, number=number)
+        return None
+
+    @staticmethod
+    def _extract_numbers(target: BaseNode) -> tuple[int, int]:
+        """Return (chapter_number, number) for any IR node that carries both."""
+        chapter = getattr(target, "chapter_number", 0) or 0
+        number = getattr(target, "number", 0) or 0
+        if chapter == 0 and number == 0:
+            caption = getattr(target, "caption", None)
+            if caption is not None:
+                chapter = getattr(caption, "chapter_number", 0) or 0
+                number = getattr(caption, "number", 0) or 0
+        return chapter, number

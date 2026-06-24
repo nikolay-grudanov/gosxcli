@@ -142,6 +142,24 @@ def _run_conversion(config: Config) -> dict[str, Any]:
     ir_document = extractor.extract()
     parse_time = time.time() - parse_start_time
 
+    # Resolve every cross-reference BEFORE the writer runs. This fills
+    # `ref_kind`, `number`, `chapter_number`, and `ref_text` on each
+    # CrossReference so the writer can render visible text directly
+    # without maintaining its own label→number map.
+    #
+    # The chapter numberer runs first because it assigns
+    # `Figure.number` / `Table.number` / `Equation.number` which the
+    # resolver then reads.
+    from .parser.numbering import ChapterNumberer
+    from .parser.refs import RefResolver
+
+    ChapterNumberer().number_document(ir_document)
+    resolver = RefResolver()
+    unresolved_warnings = resolver.resolve_document(ir_document)
+    if unresolved_warnings:
+        for w in unresolved_warnings:
+            logger.warning("Unresolved reference: %s", w)
+
     # Dump IR если нужно
     if config.dump_ir or config.dump_json:
         ir_json = _ir_to_json(ir_document)

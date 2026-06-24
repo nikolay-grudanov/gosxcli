@@ -2,10 +2,12 @@
 
 from typst_gost_docx.ir.model import (
     ChapterContext,
+    CrossReference,
     CrossRefNode,
     Figure,
     TableNode,
     Equation,
+    Paragraph,
     Section,
     Caption,
     NumberingKind,
@@ -63,8 +65,13 @@ def test_ref_resolver_infer_ref_kind():
 
 
 def test_ref_resolver_cross_ref_node():
-    """Test that RefResolver populates CrossRefNode correctly."""
-    from typst_gost_docx.ir.model import CrossRefMap
+    """Test that RefResolver populates CrossReference correctly.
+
+    The legacy ``_resolve_cross_ref_node`` private method was retired
+    in favour of the document-wide ``resolve_document`` resolver. This
+    test exercises the same logic through the public API.
+    """
+    from typst_gost_docx.ir.model import Document
 
     # Create a labeled figure
     figure = Figure(
@@ -74,18 +81,25 @@ def test_ref_resolver_cross_ref_node():
         caption=Caption(text="Results"),
     )
 
-    # Create cross-ref map and register figure
-    cross_ref_map = CrossRefMap()
-    cross_ref_map.register("fig:results", figure)
+    # Create resolver and a document that owns the figure
+    resolver = RefResolver()
+    doc = Document(id="test", blocks=[figure])
 
-    # Create resolver
-    resolver = RefResolver(cross_ref_map)
-
-    # Create CrossRefNode
-    ref = CrossRefNode(target_label="fig:results")
+    # Create a CrossReference targeting the figure
+    ref = CrossReference(target_label="fig:results")
+    # Inject the reference into a paragraph so the resolver walks it.
+    para = Paragraph(runs=[ref])
+    doc.blocks.append(para)
 
     # Resolve
-    resolver._resolve_cross_ref_node(ref)
+    warnings = resolver.resolve_document(doc)
+
+    # Resolve should succeed and populate the reference
+    assert warnings == []
+    assert ref.ref_kind == "fig"
+    assert ref.number == 2
+    assert ref.chapter_number == 1
+    assert ref.ref_text == "Рис. 1.2"
 
     # Check that ref_kind, number, chapter_number are populated
     assert ref.ref_kind == "fig"

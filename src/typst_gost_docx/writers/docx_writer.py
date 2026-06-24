@@ -294,8 +294,6 @@ class DocxWriter:
                     run.font.name = "Courier New"
             elif isinstance(node, CrossReference):
                 self._write_cross_reference(node, para)
-            elif isinstance(node, CrossRefNode):
-                self._write_cross_ref_node(node, para)
             elif isinstance(node, CitationNode):
                 self._write_citation(node, para)
             elif hasattr(node, "content"):
@@ -326,7 +324,7 @@ class DocxWriter:
                 figure.caption.chapter_number = figure.table.chapter_number
             # Write caption if present
             if figure.caption:
-                self._write_caption(figure.caption)
+                self._write_caption(figure.caption, figure.label)
             return
 
         # Regular image figure
@@ -355,7 +353,7 @@ class DocxWriter:
                 self.stats["warnings"] += 1
 
         if figure.caption:
-            self._write_caption(figure.caption)
+            self._write_caption(figure.caption, figure.label)
 
     def _write_table(self, table: TableNode) -> None:
         self.stats["tables"] += 1
@@ -462,7 +460,7 @@ class DocxWriter:
                 _render_as_image(equation.latex, self.doc)
 
         if equation.caption:
-            self._write_caption(equation.caption)
+            self._write_caption(equation.caption, equation.label)
 
     def _write_toc(self, toc: TOCNode) -> None:
         """Записывает оглавление в документ.
@@ -794,58 +792,29 @@ class DocxWriter:
         return " ".join(parts)
 
     def _write_cross_reference(self, ref: CrossReference, para: DocxParagraph) -> None:
-        target = self.bookmarks_manager.get_bookmark(ref.target_label)
+        """Write a cross-reference as a hyperlink.
 
-        if target:
-            hyperlink = OxmlElement("w:hyperlink")
-            hyperlink.set(qn("w:anchor"), ref.target_label)
-
-            run = OxmlElement("w:r")
-            rPr = OxmlElement("w:rPr")
-
-            wcolor = OxmlElement("w:color")
-            wcolor.set(qn("w:val"), "0000FF")
-            rPr.append(wcolor)
-
-            wu = OxmlElement("w:u")
-            wu.set(qn("w:val"), "single")
-            rPr.append(wu)
-
-            run.append(rPr)
-
-            wt = OxmlElement("w:t")
-            wt.text = ref.ref_text if ref.ref_text else ref.target_label
-            run.append(wt)
-
-            hyperlink.append(run)
-            para._element.append(hyperlink)
-
-            self.stats["refs_resolved"] += 1
-        else:
-            run = para.add_run(ref.ref_text if ref.ref_text else ref.target_label)
-            self.stats["refs_unresolved"] += 1
-            self.stats["warnings"] += 1
-
-    def _write_cross_ref_node(self, ref: CrossRefNode, para: DocxParagraph) -> None:
-        """Записывает CrossRefNode с chapter-aware нумерацией.
-
-        Args:
-            ref: CrossRefNode для записи.
-            para: Параграф для добавления текста ссылки.
+        ``ref.ref_text`` is expected to be populated by ``RefResolver``
+        before the writer runs (see ``cli.py``). As a fallback for legacy
+        IR or test paths where the resolver did not run, we still consult
+        ``label_number_map`` so we don't silently lose resolution.
         """
-        # Issue 5: Try to resolve numbers from already-written nodes
-        if ref.target_label in self.label_number_map:
+        ref_text = ref.ref_text or ""
+        if not ref_text and ref.target_label in self.label_number_map:
             chapter_num, num = self.label_number_map[ref.target_label]
-            ref.chapter_number = chapter_num
             ref.number = num
+            ref.chapter_number = chapter_num
+            template = {
+                "fig": "Рис. {chapter}.{number}",
+                "tbl": "Табл. {chapter}.{number}",
+                "eq": "Формула {chapter}.{number}",
+            }.get(ref.ref_kind or "")
+            if template:
+                ref_text = template.format(chapter=chapter_num, number=num)
 
-        # Format reference text based on ref_kind and numbering
-        ref_text = self._format_cross_ref(ref)
-
-        # Check if target bookmark exists
         target = self.bookmarks_manager.get_bookmark(ref.target_label)
 
-        if target:
+        if target and ref_text:
             hyperlink = OxmlElement("w:hyperlink")
             hyperlink.set(qn("w:anchor"), ref.target_label)
 
@@ -871,7 +840,12 @@ class DocxWriter:
 
             self.stats["refs_resolved"] += 1
         else:
-            run = para.add_run(ref_text)
+            # No bookmark yet or unresolved: write the visible text plainly
+            # so the reader still sees something. Use ref_text if we managed
+            # to compute it, otherwise fall back to the raw label so the bug
+            # stays visible in QA rather than silently disappearing.
+            visible = ref_text or ref.target_label
+            run = para.add_run(visible)
             self.stats["refs_unresolved"] += 1
             self.stats["warnings"] += 1
 
@@ -943,24 +917,28 @@ class DocxWriter:
 
         return formatted
 
-    def _write_caption(self, caption: Caption) -> None:
+    def _write_caption(self, caption: Caption, label: Optional[str] = None) -> Optional[object]:
+        """Write caption paragraph and optionally register a bookmark.
+
+        Returns the paragraph if ``label`` was provided, else ``None``.
+        """
         assert self.doc is not None, "Document not initialized"
-        # Get localized label from config
-        label = ""
+        # Get localized prefix from config (rename to avoid shadowing ``label`` arg)
+        prefix = ""
         if caption.numbering_kind == NumberingKind.FIGURE:
-            label = self.ref_labels.figure
+            prefix = self.ref_labels.figure
         elif caption.numbering_kind == NumberingKind.TABLE:
-            label = self.ref_labels.table
+            prefix = self.ref_labels.table
         elif caption.numbering_kind == NumberingKind.EQUATION:
-            label = self.ref_labels.equation
+            prefix = self.ref_labels.equation
 
         # Format: "Рис. 1.2 - Caption text" or "Таблица 2.1 - Caption text"
         # For equations, use parentheses: "Формула (1.3)"
-        if label:
+        if prefix:
             if caption.numbering_kind == NumberingKind.EQUATION:
-                formatted = f"{label} ({caption.chapter_number}.{caption.number})"
+                formatted = f"{prefix} ({caption.chapter_number}.{caption.number})"
             else:
-                formatted = f"{label} {caption.chapter_number}.{caption.number}"
+                formatted = f"{prefix} {caption.chapter_number}.{caption.number}"
         else:
             formatted = f"{caption.chapter_number}.{caption.number}"
 
@@ -978,6 +956,12 @@ class DocxWriter:
         if caption_style:
             self.style_resolver.apply_paragraph_style(para, caption_style)
         para.add_run(formatted)
+
+        # Register a bookmark so cross-references can hyperlink to this caption
+        if label:
+            self.bookmarks_manager.add_bookmark_if_needed(para, label)
+            return para
+        return None
 
     def _write_code_block(self, code_block: CodeBlockNode) -> None:
         """Записывает блок кода в документ.
