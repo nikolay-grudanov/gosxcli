@@ -31,10 +31,11 @@ Production-ready tool for converting Typst academic documents (especially those 
 
 ## Installation
 
-**Python 3.12 is required.** CI runs on Python 3.12.13 and the project
-pins this version in `.python-version` so `pyenv` and `uv` pick it up
-automatically. Running on 3.13 or 3.14 will pass locally but fail in CI
-because of subtle mypy / python-docx type differences.
+**Python 3.12 is recommended.** The project declares `requires-python = ">=3.12"` so 3.13+ will install, but the CI test suite runs on 3.12.13 and is the only configuration that's tested. Running locally on 3.13 or 3.14 will pass most tests but some mypy checks behave differently across Python releases, so a green local run is not a guarantee of a green CI run.
+
+The project pins the recommended version in `.python-version` (picked up
+automatically by `pyenv` and `uv python pin`) to keep local and CI in
+sync without manual flag-passing.
 
 ```bash
 # If you don't have 3.12 yet, install it via uv (or pyenv):

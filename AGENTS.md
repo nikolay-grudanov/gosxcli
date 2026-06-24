@@ -200,11 +200,14 @@ As shown in @fig:results, the results are promising.
 
 ### Python version
 
-The project targets **Python 3.12** — the same version CI runs. Pin it
-locally via `.python-version` (picked up automatically by `pyenv` and
-`uv python pin`). Mismatched local versions are the most common cause
-of "passes for me, fails in CI" surprises because mypy and python-docx
-behave differently across Python releases.
+The project is **tested on Python 3.12** — the same version CI runs.
+The declared `requires-python` is `">=3.12"` so 3.13+ will install, but
+mypy and python-docx behave slightly differently across Python
+releases, so a green local run on 3.13 is not a guarantee of a green
+CI run on 3.12. The project pins the recommended version in
+`.python-version` (picked up automatically by `pyenv` and
+`uv python pin`) to keep local and CI in sync without manual
+flag-passing.
 
 ```bash
 # First-time setup with the correct interpreter
@@ -214,9 +217,11 @@ source .venv/bin/activate
 uv pip install -e ".[dev,math]"
 ```
 
-If you only have system Python 3.13, install Python 3.12 first via
-`uv python install 3.12` (or `pyenv install 3.12.13`). Don't run the
-test suite with a different interpreter than CI.
+If you only have Python 3.13 (or newer) on your system, install 3.12
+alongside it via `uv python install 3.12` (or `pyenv install 3.12.13`)
+and use the 3.12 venv for this project. The recommended setup keeps
+local and CI in sync — running tests on 3.13 may pass locally but
+fail in CI due to subtle mypy / python-docx type differences.
 
 ### Quality Checks
 

@@ -10,6 +10,7 @@ from .model import (
     CrossRefNode,
     Section,
     Paragraph,
+    SourceLocation,
     ValidationIssue,
     ValidationResult,
     CitationNode,
@@ -56,11 +57,11 @@ class ReferenceValidator:
         """
         self.defined_labels: dict[str, BaseNode] = {}
         self.referenced_labels: set[str] = set()
-        self.defined_locations: dict[str, object] = {}
-        self.referenced_locations: dict[str, object] = {}
+        self.defined_locations: dict[str, SourceLocation] = {}
+        self.referenced_locations: dict[str, SourceLocation] = {}
         self.bibliography_entries: dict[str, BibliographyEntry] = bibliography_entries or {}
         self.referenced_citations: set[str] = set()
-        self.citation_locations: dict[str, object] = {}
+        self.citation_locations: dict[str, SourceLocation] = {}
 
     def collect_from_document(self, doc: Document) -> None:
         """Собирает все метки и ссылки из IR документа.
@@ -157,9 +158,9 @@ class ReferenceValidator:
                 ValidationIssue(
                     label=ref,
                     kind=ISSUE_UNDEFINED_REF,
-                    file_path=getattr(loc, "file_path", "") or "",
-                    line=getattr(loc, "line", 0) or 0,
-                    column=getattr(loc, "column", 0) or 0,
+                    file_path=loc.file_path if loc is not None else "",
+                    line=loc.line if loc is not None else 0,
+                    column=loc.column if loc is not None else 0,
                 )
             )
         for label in sorted(unreferenced_labels):
@@ -168,9 +169,9 @@ class ReferenceValidator:
                 ValidationIssue(
                     label=label,
                     kind=ISSUE_UNREFERENCED_LABEL,
-                    file_path=getattr(loc, "file_path", "") or "",
-                    line=getattr(loc, "line", 0) or 0,
-                    column=getattr(loc, "column", 0) or 0,
+                    file_path=loc.file_path if loc is not None else "",
+                    line=loc.line if loc is not None else 0,
+                    column=loc.column if loc is not None else 0,
                 )
             )
 
@@ -183,9 +184,9 @@ class ReferenceValidator:
                     ValidationIssue(
                         label=key,
                         kind=ISSUE_MISSING_CITATION,
-                        file_path=getattr(loc, "file_path", "") or "",
-                        line=getattr(loc, "line", 0) or 0,
-                        column=getattr(loc, "column", 0) or 0,
+                        file_path=loc.file_path if loc is not None else "",
+                        line=loc.line if loc is not None else 0,
+                        column=loc.column if loc is not None else 0,
                     )
                 )
 
